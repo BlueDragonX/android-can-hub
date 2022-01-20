@@ -22,7 +22,6 @@ private const val CHANNEL_ID = "BridgeServiceChannel"
 
 class BridgeService : Service() {
     private var running: Boolean = false
-    private var count: Int = 0
     private var prober: UsbSerialProber? = null
     private var port : UsbSerialPort? = null
     private var ioManager : SerialInputOutputManager? = null
@@ -35,27 +34,28 @@ class BridgeService : Service() {
         super.onCreate()
         Log.v(TAG, "service created")
 
-        // Create USB serial prober.
+        // Create USB serial prober with extra devices.
         val probeTable = UsbSerialProber.getDefaultProbeTable()
         probeTable.addProduct(0x03EB, 0x802B, CdcAcmSerialDriver::class.java) // SAME51
         prober = UsbSerialProber(probeTable)
 
         // Handle USB intents.
         val intentFilter = IntentFilter()
-        intentFilter.addAction(ACTION_USB_DEVICE_CONNECTED)
+        intentFilter.addAction(ACTION_SERIAL_DEVICE_CONNECT)
         intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        intentFilter.addAction(ACTION_USB_DEVICE_PERMISSION)
         registerReceiver(broadcastReceiver, intentFilter)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         running = true
         startForeground(1, createNotification())
-        Log.v(TAG, "service start")
+        Log.v(TAG, "bridge service started")
 
         // start listening for connections and disconnections
         // if this was triggered by a connect intent, start listening on that device
-        onIntent(intent)
+        intent?.let {
+            onIntent(it)
+        }
 
         return START_REDELIVER_INTENT
     }
@@ -63,7 +63,7 @@ class BridgeService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(broadcastReceiver)
-        running = false
+        Log.v(TAG, "bridge service stopped")
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -90,37 +90,42 @@ class BridgeService : Service() {
     }
 
     // Create a serial connection on a USB device that we already have permission to access.
-    private fun connect(device : UsbDevice) {
+    private fun onConnect(device: UsbDevice, config: SerialConfig) {
         val driver = prober?.probeDevice(device)
         if (driver == null) {
-            Log.i(TAG, "device ${device.manufacturerName} ${device.productName} not supported")
-        } else {
-            Log.i(TAG, "device ${device.manufacturerName} ${device.productName} available")
-            val manager = getSystemService(UsbManager::class.java)
-            val con = manager.openDevice(device)
-            if (con == null) {
-                Log.d(TAG, "failed to open usb device")
-                return;
-            }
-            if (driver.ports.size == 0) {
-                Log.d(TAG, "device has no ports")
-                return;
-            }
-            port = driver.ports[0]
-            port?.let {
-                port?.open(con)
-                port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-                port?.dtr = true
-                ioManager = SerialInputOutputManager(port, ioListener)
-            }
-            ioManager?.let {
-            it.start()
-            }
+            Log.e(TAG, "USB device ${device.deviceName} not supported by serial driver")
+            Log.e(TAG, "    manufacturer=\"${device.manufacturerName}\"")
+            Log.e(TAG, "    product=\"${device.productName}\"")
+            Log.e(TAG, "    vendor_id=${device.vendorId}")
+            Log.e(TAG, "    product_id=${device.productId}")
+            return;
         }
+
+        val manager = getSystemService(UsbManager::class.java)
+        val con = manager.openDevice(device)
+        if (con == null) {
+            Log.e(TAG, "failed to open USB device ${device.deviceName}")
+            return;
+        }
+        if (driver.ports.size == 0) {
+            Log.e(TAG, "USB device ${device.deviceName} has no ports")
+            return;
+        }
+        port = driver.ports[0]
+        port?.let {
+            port?.open(con)
+            port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+            port?.dtr = true
+            ioManager = SerialInputOutputManager(port, ioListener)
+        }
+        ioManager?.let {
+            it.start()
+        }
+        Log.i(TAG, "USB device ${device.deviceName} connected to serial")
     }
 
     // Disconnect a device.
-    private fun disconnect(device : UsbDevice) {
+    private fun onDisconnect(device: UsbDevice) {
         Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
         ioManager?.let {
             it.stop()
@@ -132,48 +137,20 @@ class BridgeService : Service() {
         }
     }
 
-    // Request permission to connect to a device for which we did not receive an intent.
-    private fun requestConnect(device : UsbDevice) {
-        val manager = getSystemService(UsbManager::class.java)
-        if (!manager.hasPermission(device)) {
-            Log.i(TAG,"request permission for ${device.manufacturerName} ${device.productName}")
-            val pendingIntent =
-                PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_DEVICE_PERMISSION), 0)
-            manager.requestPermission(device, pendingIntent)
-            return
-        }
-        connect(device)
-    }
-
-    private fun onIntent(intent : Intent?) {
-        when (intent?.action) {
-            ACTION_USB_DEVICE_CONNECTED -> {
-                count++
-                Log.v(TAG, "connected ${count} times")
+    private fun onIntent(intent : Intent) {
+        Log.d(TAG, "BridgeService received intent ${intent.action}")
+        when (intent.action) {
+            ACTION_SERIAL_DEVICE_CONNECT -> {
                 val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                Log.v(TAG, "ACTION_USB_DEVICE_CONNECTED ${device?.manufacturerName} ${device?.productName}")
-                device?.let {
-                    connect(it)
+                val config: SerialConfig? = intent.getParcelableExtra(EXTRA_SERIAL_CONFIG)
+                if (device != null && config != null) {
+                    onConnect(device, config)
                 }
             }
             UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                 val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                Log.v(TAG, "ACTION_USB_DEVICE_DETACHED ${device?.manufacturerName} ${device?.productName}")
                 device?.let {
-                    disconnect(it)
-                }
-            }
-            ACTION_USB_DEVICE_PERMISSION -> {
-                val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                device?.let {
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        Log.d(TAG, "usb permission granted on ${device.manufacturerName} ${device.productName} (${device.serialNumber})")
-                        val sendIntent = Intent(ACTION_USB_DEVICE_CONNECTED)
-                        sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-                        sendBroadcast(sendIntent)
-                    } else {
-                        Log.d(TAG, "usb permission denied on ${device.manufacturerName} ${device.productName} (${device.serialNumber})")
-                    }
+                    onDisconnect(it)
                 }
             }
         }
@@ -181,8 +158,9 @@ class BridgeService : Service() {
 
     var broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(TAG, "service received ${intent?.action}")
-            onIntent(intent)
+            intent?.let {
+                onIntent(it)
+            }
         }
     }
 
@@ -196,7 +174,7 @@ class BridgeService : Service() {
         }
 
         override fun onRunError(e: Exception?) {
-            Log.e(TAG, "error: ${e.toString()}")
+            Log.w(TAG, "error encountered  during serial read: ${e.toString()}")
         }
     }
 }
