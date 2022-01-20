@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
 
         val stop: Button = findViewById(R.id.stopButton)
         stop.setOnClickListener() {
-            Log.v(TAG, "button stoppint service")
+            Log.v(TAG, "button stopping service")
             val intent  = Intent(this, BridgeService::class.java)
             stopService(intent)
         }
@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
                 text.append("Class: ${device.value.deviceClass}\n")
                 text.append("Sub-Class: ${device.value.deviceSubclass}\n")
                 text.append("Protocol: ${device.value.deviceProtocol}\n")
+                text.append("Vendor ID: ${device.value.vendorId}\n")
+                text.append("Product ID: ${device.value.productId}\n")
                 text.append("\n")
             }
 

@@ -13,12 +13,19 @@ import android.os.IBinder
 import android.provider.SyncStateContract
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.hoho.android.usbserial.driver.*
+import com.hoho.android.usbserial.util.SerialInputOutputManager
+import java.lang.Exception
+import java.lang.StringBuilder
 
 private const val CHANNEL_ID = "BridgeServiceChannel"
 
 class BridgeService : Service() {
     private var running: Boolean = false
     private var count: Int = 0
+    private var prober: UsbSerialProber? = null
+    private var port : UsbSerialPort? = null
+    private var ioManager : SerialInputOutputManager? = null
 
     public fun getRunning() : Boolean {
         return running
@@ -27,6 +34,11 @@ class BridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.v(TAG, "service created")
+
+        // Create USB serial prober.
+        val probeTable = UsbSerialProber.getDefaultProbeTable()
+        probeTable.addProduct(0x03EB, 0x802B, CdcAcmSerialDriver::class.java) // SAME51
+        prober = UsbSerialProber(probeTable)
 
         // Handle USB intents.
         val intentFilter = IntentFilter()
@@ -79,12 +91,45 @@ class BridgeService : Service() {
 
     // Create a serial connection on a USB device that we already have permission to access.
     private fun connect(device : UsbDevice) {
-        Log.i(TAG, "connected to ${device.manufacturerName} ${device.productName}", )
+        val driver = prober?.probeDevice(device)
+        if (driver == null) {
+            Log.i(TAG, "device ${device.manufacturerName} ${device.productName} not supported")
+        } else {
+            Log.i(TAG, "device ${device.manufacturerName} ${device.productName} available")
+            val manager = getSystemService(UsbManager::class.java)
+            val con = manager.openDevice(device)
+            if (con == null) {
+                Log.d(TAG, "failed to open usb device")
+                return;
+            }
+            if (driver.ports.size == 0) {
+                Log.d(TAG, "device has no ports")
+                return;
+            }
+            port = driver.ports[0]
+            port?.let {
+                port?.open(con)
+                port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+                port?.dtr = true
+                ioManager = SerialInputOutputManager(port, ioListener)
+            }
+            ioManager?.let {
+            it.start()
+            }
+        }
     }
 
     // Disconnect a device.
     private fun disconnect(device : UsbDevice) {
         Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
+        ioManager?.let {
+            it.stop()
+            ioManager = null
+        }
+        port?.let {
+            it.close()
+            port = null
+        }
     }
 
     // Request permission to connect to a device for which we did not receive an intent.
@@ -138,6 +183,20 @@ class BridgeService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             Log.d(TAG, "service received ${intent?.action}")
             onIntent(intent)
+        }
+    }
+
+    var ioListener = object : SerialInputOutputManager.Listener {
+        override fun onNewData(bytes: ByteArray) {
+            var hex = StringBuilder()
+            for (byte in bytes) {
+                hex.append("%02x".format(byte))
+            }
+            Log.v(TAG, "read bytes \"${hex}\"")
+        }
+
+        override fun onRunError(e: Exception?) {
+            Log.e(TAG, "error: ${e.toString()}")
         }
     }
 }
