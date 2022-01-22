@@ -5,7 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.exp
 
 class FrameBuilderTest {
     @Test
@@ -14,7 +13,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode44Frame(expectFrame), frames, errors)
+        buildFrame(RealDash.encode44Frame(expectFrame), frames, errors)
 
         assertEquals(mutableListOf<Error>(), errors)
         assertEquals(mutableListOf(expectFrame), frames)
@@ -27,7 +26,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode44Frame(expectFrame1) + encode44Frame(expectFrame2), frames, errors)
+        buildFrame(RealDash.encode44Frame(expectFrame1) + RealDash.encode44Frame(expectFrame2), frames, errors)
 
         assertEquals(mutableListOf<Error>(), errors)
         assertEquals(mutableListOf(expectFrame1, expectFrame2), frames)
@@ -39,7 +38,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame("392c1b4c".decodeHex() + encode44Frame(expectFrame), frames, errors)
+        buildFrame("392c1b4c".decodeHex() + RealDash.encode44Frame(expectFrame), frames, errors)
 
         assertTrue(errors.size > 0)
         assertEquals(mutableListOf(expectFrame), frames)
@@ -52,7 +51,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode44Frame(expectFrame1) + "76b2e6e7d213".decodeHex() + encode44Frame(expectFrame2), frames, errors)
+        buildFrame(RealDash.encode44Frame(expectFrame1) + "76b2e6e7d213".decodeHex() + RealDash.encode44Frame(expectFrame2), frames, errors)
 
         assertTrue(errors.size > 0)
         assertEquals(mutableListOf(expectFrame1, expectFrame2), frames)
@@ -64,7 +63,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode66Frame(expectFrame), frames, errors)
+        buildFrame(RealDash.encode66Frame(expectFrame), frames, errors)
 
         assertEquals(mutableListOf<Error>(), errors)
         assertEquals(mutableListOf(expectFrame), frames)
@@ -77,7 +76,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode66Frame(expectFrame1) + encode66Frame(expectFrame2), frames, errors)
+        buildFrame(RealDash.encode66Frame(expectFrame1) + RealDash.encode66Frame(expectFrame2), frames, errors)
 
         assertEquals(mutableListOf<Error>(), errors)
         assertEquals(mutableListOf(expectFrame1, expectFrame2), frames)
@@ -89,7 +88,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame("392c1b4c".decodeHex() + encode66Frame(expectFrame), frames, errors)
+        buildFrame("392c1b4c".decodeHex() + RealDash.encode66Frame(expectFrame), frames, errors)
 
         assertTrue(errors.size > 0)
         assertEquals(mutableListOf(expectFrame), frames)
@@ -102,7 +101,7 @@ class FrameBuilderTest {
 
         val frames = mutableListOf<Frame>()
         val errors = mutableListOf<Error>()
-        buildFrame(encode66Frame(expectFrame1) + "76b2e6e7d213".decodeHex() + encode66Frame(expectFrame2), frames, errors)
+        buildFrame(RealDash.encode66Frame(expectFrame1) + "76b2e6e7d213".decodeHex() + RealDash.encode66Frame(expectFrame2), frames, errors)
 
         assertTrue(errors.size > 0)
         assertEquals(mutableListOf(expectFrame1, expectFrame2), frames)
@@ -120,31 +119,6 @@ class FrameBuilderTest {
 
         val builder = FrameBuilder(onFrame)
         builder.update(bytes, onError)
-    }
-
-    fun encode44Frame(frame: Frame): ByteArray {
-        val cs = Frame44Checksum()
-        cs.update(frame)
-        val buffer = ByteBuffer.allocate(9 + frame.data.size)
-        buffer.order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put("44332211".decodeHex())
-        buffer.putInt(frame.id.toInt())
-        buffer.put(frame.data)
-        buffer.put(cs.value.toByte())
-        return buffer.array()
-    }
-
-    fun encode66Frame(frame: Frame): ByteArray {
-        val cs = Frame66Checksum()
-        cs.update(frame)
-        val buffer = ByteBuffer.allocate(12 + frame.data.size)
-        buffer.order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put("663322".decodeHex())
-        buffer.put((frame.data.size / 4 + 15).toByte())
-        buffer.putInt(frame.id.toInt())
-        buffer.put(frame.data)
-        buffer.putInt(cs.value.toInt())
-        return buffer.array()
     }
 
     fun checkFrames(left: MutableList<Frame>, right: MutableList<Frame>) {

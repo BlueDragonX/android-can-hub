@@ -64,7 +64,7 @@ class StreamNode(private val stream: ByteStream) : EventNode() {
     }
 
     override fun send(event: FrameBroadcast): Throwable? {
-        val cs = Frame66Checksum()
+        val cs = RealDash66Checksum()
         cs.update(event.frame)
         val buffer = ByteBuffer.allocate(12 + event.frame.data.size)
         buffer.order(ByteOrder.LITTLE_ENDIAN)

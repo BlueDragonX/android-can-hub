@@ -11,8 +11,8 @@ class FrameBuilder(val onFrame: (Frame)->Unit) {
     private var frameSize: Int = 0
     private var frameData = ByteBuffer.allocate(0)
     private val frameChecksum = ByteBuffer.allocate(8)
-    private val calc44Checksum = Frame44Checksum()
-    private val calc66Checksum = Frame66Checksum()
+    private val calc44Checksum = RealDash44Checksum()
+    private val calc66Checksum = RealDash66Checksum()
 
     init {
         frameId.order(ByteOrder.LITTLE_ENDIAN)
