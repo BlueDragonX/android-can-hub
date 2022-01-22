@@ -21,23 +21,16 @@ import java.lang.StringBuilder
 private const val CHANNEL_ID = "BridgeServiceChannel"
 
 class BridgeService : Service() {
-    private var running: Boolean = false
-    private var prober: UsbSerialProber? = null
-    private var port : UsbSerialPort? = null
-    private var ioManager : SerialInputOutputManager? = null
-
-    public fun getRunning() : Boolean {
-        return running
-    }
+    private var serialDevice: UsbSerialDevice? = null
+    private var ioManager: SerialInputOutputManager? = null
+    private var serialManager: UsbSerialManager? = null
 
     override fun onCreate() {
         super.onCreate()
         Log.v(TAG, "service created")
 
-        // Create USB serial prober with extra devices.
-        val probeTable = UsbSerialProber.getDefaultProbeTable()
-        probeTable.addProduct(0x03EB, 0x802B, CdcAcmSerialDriver::class.java) // SAME51
-        prober = UsbSerialProber(probeTable)
+        // Create USB serial manager.
+        serialManager = UsbSerialManager(getSystemService(UsbManager::class.java))
 
         // Handle USB intents.
         val intentFilter = IntentFilter()
@@ -47,7 +40,6 @@ class BridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        running = true
         startForeground(1, createNotification())
         Log.v(TAG, "bridge service started")
 
@@ -90,50 +82,27 @@ class BridgeService : Service() {
     }
 
     // Create a serial connection on a USB device that we already have permission to access.
-    private fun onConnect(device: UsbDevice, config: SerialConfig) {
-        val driver = prober?.probeDevice(device)
-        if (driver == null) {
-            Log.e(TAG, "USB device ${device.deviceName} not supported by serial driver")
+    private fun onConnect(device: UsbDevice, config: UsbSerialConfig) {
+        val openResult = serialManager?.open(device, config)
+        if (openResult?.ok() == true) {
+            serialDevice = openResult.value
+            Log.i(TAG, "USB device ${device.deviceName} connected to serial")
+        } else {
+            Log.e(TAG, "open USB device ${device.deviceName} failed: ${openResult?.error}")
             Log.e(TAG, "    manufacturer=\"${device.manufacturerName}\"")
             Log.e(TAG, "    product=\"${device.productName}\"")
             Log.e(TAG, "    vendor_id=${device.vendorId}")
             Log.e(TAG, "    product_id=${device.productId}")
-            return;
         }
-
-        val manager = getSystemService(UsbManager::class.java)
-        val con = manager.openDevice(device)
-        if (con == null) {
-            Log.e(TAG, "failed to open USB device ${device.deviceName}")
-            return;
-        }
-        if (driver.ports.size == 0) {
-            Log.e(TAG, "USB device ${device.deviceName} has no ports")
-            return;
-        }
-        port = driver.ports[0]
-        port?.let {
-            port?.open(con)
-            port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-            port?.dtr = true
-            ioManager = SerialInputOutputManager(port, ioListener)
-        }
-        ioManager?.let {
-            it.start()
-        }
-        Log.i(TAG, "USB device ${device.deviceName} connected to serial")
     }
 
     // Disconnect a device.
     private fun onDisconnect(device: UsbDevice) {
-        Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
-        ioManager?.let {
-            it.stop()
-            ioManager = null
-        }
-        port?.let {
-            it.close()
-            port = null
+        serialDevice?.let {
+            if (it.getDevice().deviceName == device.deviceName) {
+                it.close()
+                Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
+            }
         }
     }
 
@@ -142,7 +111,7 @@ class BridgeService : Service() {
         when (intent.action) {
             ACTION_SERIAL_DEVICE_CONNECT -> {
                 val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                val config: SerialConfig? = intent.getParcelableExtra(EXTRA_SERIAL_CONFIG)
+                val config: UsbSerialConfig? = intent.getParcelableExtra(EXTRA_USB_SERIAL_CONFIG)
                 if (device != null && config != null) {
                     onConnect(device, config)
                 }

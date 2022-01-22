@@ -21,7 +21,7 @@ const val ACTION_USB_DEVICE_READY = "org.techylines.action.USB_DEVICE_READY"
 const val ACTION_USB_DEVICE_PERMISSION = "org.techylines.action.USB_DEVICE_PERMISSION"
 const val ACTION_SERIAL_DEVICE_CONFIGURE = "org.techylines.action.SERIAL_DEVICE_CONFIGURE"
 const val ACTION_SERIAL_DEVICE_CONNECT = "org.techylines.action.SERIAL_DEVICE_CONNECT"
-const val EXTRA_SERIAL_CONFIG = "org.techylines.EXTRA_SERIAL_CONFIG"
+const val EXTRA_USB_SERIAL_CONFIG = "org.techylines.EXTRA_USB_SERIAL_CONFIG"
 
 class MainActivity : AppCompatActivity() {
     var usbManager : UsbManager? = null
@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
             // connect the device
             val sendIntent = Intent(ACTION_SERIAL_DEVICE_CONNECT)
             sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-            sendIntent.putExtra(EXTRA_SERIAL_CONFIG, config)
+            sendIntent.putExtra(EXTRA_USB_SERIAL_CONFIG, config)
             sendBroadcast(sendIntent)
         }
     }
@@ -120,12 +120,12 @@ class MainActivity : AppCompatActivity() {
         usbManager?.requestPermission(device, pendingIntent)
     }
 
-    private fun loadSerialConfig(device: UsbDevice): SerialConfig? {
+    private fun loadSerialConfig(device: UsbDevice): UsbSerialConfig? {
         // TODO: Implement a storage system of some flavor.
-        return SerialConfig()
+        return UsbSerialConfig()
     }
 
-    private fun saveSerialConfig(device: UsbDevice, config: SerialConfig)  {
+    private fun saveSerialConfig(device: UsbDevice, config: UsbSerialConfig)  {
         // TODO: Implement a storage system of some flavor.
     }
 
