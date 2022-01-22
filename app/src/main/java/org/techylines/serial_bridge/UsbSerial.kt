@@ -46,6 +46,11 @@ class UsbSerialConfig(
 // USB serial device. Allows reading and writing to a serial device.
 class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialConfig, val manager: UsbSerialManager) :
     ByteStream() {
+
+    override fun getName(): String {
+        return port.device.deviceName
+    }
+
     // Return the USB device that backs this serial device.
     fun getDevice(): UsbDevice {
         return port.device
@@ -57,14 +62,14 @@ class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialCon
     }
 
     // Read bytes from the device.
-    override fun read(bytes: ByteArray): Int {
-        return port.read(bytes, 0)
+    override fun read(bytes: ByteArray): Result<Int> = runCatching {
+        port.read(bytes, 0)
     }
 
     // Write bytes to the device.
-    override fun write(bytes: ByteArray) {
+    override fun write(bytes: ByteArray): Throwable? = runCatching {
         port.write(bytes, 0)
-    }
+    }.exceptionOrNull()
 
     override fun makeReadBuffer(): ByteArray {
         return ByteArray(port.getReadEndpoint().getMaxPacketSize());
