@@ -8,6 +8,7 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import kotlinx.parcelize.Parcelize
+import java.io.IOException
 import java.nio.ByteBuffer
 
 // Configuration for USB serial devices.
@@ -97,33 +98,30 @@ class UsbSerialManager(val usbManager: UsbManager) {
     }
 
     // Open a USB connection. Returns an error if the device was already open or on failure.
-    fun open(device: UsbDevice, config: UsbSerialConfig): Result<UsbSerialDevice> {
+    fun open(device: UsbDevice, config: UsbSerialConfig): Result<UsbSerialDevice> = runCatching {
         val driver = prober?.probeDevice(device) ?:
-            return Result.Failure("USB device ${device.deviceName} not supported by serial driver")
-        if (driver.ports.size == 0) {
-            return Result.Failure("USB device ${device.deviceName} has no ports")
-        }
+            throw IOException("USB device ${device.deviceName} not supported by serial driver")
+        val port = driver.ports[0] ?:
+            throw IOException("USB device ${device.deviceName} has no ports")
         val con = usbManager.openDevice(device) ?:
-            return Result.Failure("failed to open USB device ${device.deviceName}")
-        val port = driver.ports[0]
-        port?.let {
-            it.open(con)
-            it.setParameters(config.baudRate, config.dataBits.value, config.stopBits.value, config.parity.value)
-            it.dtr = config.dtr
-            it.rts = config.rts
-            val serialDevice = UsbSerialDevice(it, config, this)
-            serialDevices[device.deviceName] = serialDevice
-            return Result.Success(serialDevice)
-        }
-        return Result.Failure("failed to configure USB serial device")
+            throw IOException("failed to open USB device ${device.deviceName}")
+        port.open(con)
+        port.setParameters(config.baudRate, config.dataBits.value, config.stopBits.value, config.parity.value)
+        port.dtr = config.dtr
+        port.rts = config.rts
+        val serialDevice = UsbSerialDevice(port, config, this)
+        serialDevices[device.deviceName] = serialDevice
+        serialDevice
     }
 
     // Close a device.
-    fun close(device: UsbDevice) {
+    fun close(device: UsbDevice): Boolean {
         serialDevices[device.deviceName]?.let {
             // This will remove the device from the manager as well.
             it.close()
+            return true
         }
+        return false
     }
 
     // Return a list of open devices.

@@ -84,11 +84,11 @@ class BridgeService : Service() {
     // Create a serial connection on a USB device that we already have permission to access.
     private fun onConnect(device: UsbDevice, config: UsbSerialConfig) {
         val openResult = serialManager?.open(device, config)
-        if (openResult?.ok() == true) {
-            serialDevice = openResult.value
+        serialDevice = openResult?.getOrNull()
+        if (serialDevice != null) {
             Log.i(TAG, "USB device ${device.deviceName} connected to serial")
         } else {
-            Log.e(TAG, "open USB device ${device.deviceName} failed: ${openResult?.error}")
+            Log.e(TAG, "open USB device ${device.deviceName} failed: ${openResult?.exceptionOrNull()}")
             Log.e(TAG, "    manufacturer=\"${device.manufacturerName}\"")
             Log.e(TAG, "    product=\"${device.productName}\"")
             Log.e(TAG, "    vendor_id=${device.vendorId}")
@@ -98,11 +98,8 @@ class BridgeService : Service() {
 
     // Disconnect a device.
     private fun onDisconnect(device: UsbDevice) {
-        serialDevice?.let {
-            if (it.getDevice().deviceName == device.deviceName) {
-                it.close()
-                Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
-            }
+        if (serialManager?.close(device) == true) {
+            Log.i(TAG, "disconnected from ${device.manufacturerName} ${device.productName}")
         }
     }
 
