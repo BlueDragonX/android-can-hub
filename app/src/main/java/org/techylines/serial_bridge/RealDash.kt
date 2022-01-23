@@ -1,10 +1,10 @@
 package org.techylines.serial_bridge
 
 import android.util.Log
-import android.net.ParseException
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.text.ParseException
 import java.util.zip.CRC32
 import java.util.zip.Checksum
 
@@ -53,7 +53,7 @@ class RealDash44Checksum : Checksum {
     }
 
     override fun update(bytes: ByteArray, offset: Int, len: Int) {
-        for (i in offset..offset+len-1) {
+        for (i in offset until offset+len) {
             if (i >= bytes.size) {
                 break
             }
@@ -96,7 +96,7 @@ class RealDash66Checksum : CRC32() {
 }
 
 // Read RealDash formatted frames from a byte stream.
-class RealDashReader(val byteReader: ByteReader) : FrameReader {
+class RealDashReader(private val byteReader: ByteReader) : FrameReader {
     private var readSize: Int = 0
     private val frameId = ByteBuffer.allocate(8)
     private var frameType: Byte = 0
@@ -161,31 +161,31 @@ class RealDashReader(val byteReader: ByteReader) : FrameReader {
             // Parse header.
             1 -> {
                 // We do not support RealDash text frame types.
-                when (byte) {
+                frameType = when (byte) {
                     0x44.b -> {
                         frameChecksum.limit(1)
-                        frameType = byte
+                        byte
                     }
                     0x66.b -> {
                         frameChecksum.limit(4)
-                        frameType = byte
+                        byte
                     }
                     else -> {
                         reset()
-                        return ParseException("unsupported frame type, byte[0]=${byte.s}")
+                        return ParseException("unsupported frame type, byte[0]=${byte.s}", 0)
                     }
                 }
             }
             2 -> {
                 if (byte != 0x33.b) {
                     reset()
-                    return ParseException("invalid frame header, byte[1]=${byte.s}")
+                    return ParseException("invalid frame header, byte[1]=${byte.s}", 0)
                 }
             }
             3 -> {
                 if (byte != 0x22.b) {
                     reset()
-                    return ParseException("invalid frame header, byte[2]=${byte.s}")
+                    return ParseException("invalid frame header, byte[2]=${byte.s}", 0)
                 }
             }
             4 -> {
@@ -197,7 +197,7 @@ class RealDashReader(val byteReader: ByteReader) : FrameReader {
                 buffer.order(ByteOrder.LITTLE_ENDIAN)
                 buffer.put(byte)
                 buffer.rewind()
-                frameSize = (buffer.getInt() - 15) * 4;
+                frameSize = (buffer.int - 15) * 4
                 frameData = ByteBuffer.allocate(frameSize)
             }
             else -> {
@@ -235,12 +235,12 @@ class RealDashReader(val byteReader: ByteReader) : FrameReader {
     private fun validateChecksum(byte: Byte): Result<Frame?> {
         frameChecksum.put(byte)
         if (frameChecksum.remaining() > 0) {
-            return Result.success(null);
+            return Result.success(null)
         }
 
         frameChecksum.rewind()
         frameChecksum.limit(8)
-        val frameChecksumValue = frameChecksum.getLong()
+        val frameChecksumValue = frameChecksum.long
         val calcChecksumValue = getChecksumValue()
 
         if (frameChecksumValue != calcChecksumValue) {
@@ -249,7 +249,7 @@ class RealDashReader(val byteReader: ByteReader) : FrameReader {
         }
 
         frameId.rewind()
-        val frame = Frame(frameId.getLong(), frameData.array())
+        val frame = Frame(frameId.long, frameData.array())
         reset()
         return Result.success(frame)
     }

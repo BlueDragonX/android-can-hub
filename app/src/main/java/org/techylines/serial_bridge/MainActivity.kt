@@ -24,7 +24,7 @@ const val ACTION_SERIAL_DEVICE_CONNECT = "org.techylines.action.SERIAL_DEVICE_CO
 const val EXTRA_USB_SERIAL_CONFIG = "org.techylines.EXTRA_USB_SERIAL_CONFIG"
 
 class MainActivity : AppCompatActivity() {
-    var usbManager : UsbManager? = null
+    private var usbManager : UsbManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestUsbDevicePermission(device : UsbDevice) {
         val pendingIntent =
-            PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_DEVICE_PERMISSION), 0)
+            PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_DEVICE_PERMISSION), PendingIntent.FLAG_IMMUTABLE)
         usbManager?.requestPermission(device, pendingIntent)
     }
 
@@ -132,20 +132,20 @@ class MainActivity : AppCompatActivity() {
     private fun showContent() {
         setContentView(R.layout.activity_main)
         val start: Button = findViewById(R.id.startButton)
-        start.setOnClickListener() {
+        start.setOnClickListener {
             Log.v(TAG, "button starting service")
             ContextCompat.startForegroundService(this, Intent(this, BridgeService::class.java))
         }
 
         val stop: Button = findViewById(R.id.stopButton)
-        stop.setOnClickListener() {
+        stop.setOnClickListener {
             Log.v(TAG, "button stopping service")
             val intent  = Intent(this, BridgeService::class.java)
             stopService(intent)
         }
 
         val refresh: Button = findViewById(R.id.refreshButton)
-        refresh.setOnClickListener() {
+        refresh.setOnClickListener {
             val usbManager = getSystemService(UsbManager::class.java)
             val text = StringBuilder()
             if (usbManager.deviceList.size == 0) {
@@ -168,7 +168,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    var broadcastReceiver = object : BroadcastReceiver() {
+    private var broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent?.let {
                 onIntent(it)

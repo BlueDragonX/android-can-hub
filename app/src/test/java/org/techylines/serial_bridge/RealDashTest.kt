@@ -1,11 +1,9 @@
 package org.techylines.serial_bridge
 
-import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.lang.Exception
 import java.util.zip.CRC32
-import kotlin.math.exp
 
 class RealDashTest {
     @Test
@@ -184,7 +182,7 @@ class RealDashReaderTest {
         assertReadEquals(frame2, reader)
     }
 
-    fun assertReadEquals(expect: Any, reader: RealDashReader) {
+    private fun assertReadEquals(expect: Any, reader: RealDashReader) {
         val result = reader.read()
         val expectResult: Result<Frame> = when(expect) {
             is Frame -> Result.success(expect)

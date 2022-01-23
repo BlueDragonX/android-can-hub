@@ -1,7 +1,5 @@
 package org.techylines.serial_bridge
 
-import java.nio.ByteBuffer
-
 fun String.decodeHex(): ByteArray {
     check(length % 2 == 0) { "must have an even length" }
     return chunked(2)

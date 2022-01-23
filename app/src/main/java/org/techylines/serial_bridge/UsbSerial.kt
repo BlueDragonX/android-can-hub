@@ -9,7 +9,6 @@ import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import kotlinx.parcelize.Parcelize
 import java.io.IOException
-import java.nio.ByteBuffer
 
 // Configuration for USB serial devices.
 @Parcelize
@@ -72,7 +71,7 @@ class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialCon
     }.exceptionOrNull()
 
     override fun makeReadBuffer(): ByteArray {
-        return ByteArray(port.getReadEndpoint().getMaxPacketSize());
+        return ByteArray(port.readEndpoint.maxPacketSize)
     }
 
     // Return true if the device is open.
