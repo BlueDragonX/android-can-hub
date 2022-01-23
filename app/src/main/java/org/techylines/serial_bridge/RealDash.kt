@@ -96,7 +96,7 @@ class RealDash66Checksum : CRC32() {
 }
 
 // Read RealDash formatted frames from a byte stream.
-class RealDashReader(private val byteReader: ByteReader) : FrameReader {
+open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
     private var readSize: Int = 0
     private val frameId = ByteBuffer.allocate(8)
     private var frameType: Byte = 0
@@ -112,7 +112,7 @@ class RealDashReader(private val byteReader: ByteReader) : FrameReader {
     }
 
     override fun read(): Result<Frame> {
-        for (byte in byteReader) {
+        for (byte in byteStream) {
             val result = update(byte)
             result.getOrNull()?.let {
                 return Result.success(it)
@@ -129,12 +129,23 @@ class RealDashReader(private val byteReader: ByteReader) : FrameReader {
         return Result.failure(IOException("reader is closed"))
     }
 
+    override fun write(frame: Frame): Throwable? {
+        var position = 0
+        val bytes = RealDash.encode66Frame(frame)
+        while (position < bytes.size) {
+            val result = byteStream.write(bytes.sliceArray(IntRange(position, bytes.size-1)))
+            val written = result.getOrNull()
+            position += written ?: return result.exceptionOrNull()
+        }
+        return null
+    }
+
     override fun close(): Throwable? {
-        return byteReader.close()
+        return byteStream.close()
     }
 
     override fun isClosed(): Boolean {
-        return byteReader.isClosed()
+        return byteStream.isClosed()
     }
 
     // Update internal Frame state with a byte. Return a ParseException on failure, a Frame if one has been

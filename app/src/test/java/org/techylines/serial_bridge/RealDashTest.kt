@@ -88,107 +88,136 @@ class RealDash66ChecksumTest {
     }
 }
 
-class RealDashReaderTest {
+class RealDashStreamTest {
     @Test
     fun read44Frame() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             RealDash.encode44Frame(frame1)
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
     }
 
     @Test
     fun read44MultipleFrames() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
         val frame2 = Frame(0x5800, "4fca738ce2174708".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             RealDash.encode44Frame(frame1),
             RealDash.encode44Frame(frame2)
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
-        assertReadEquals(frame2, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
+        assertReadEquals(frame2, frameStream)
     }
 
     @Test
     fun read44FrameWithTrashPrefix() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             "392c1b4c".decodeHex(),
             RealDash.encode44Frame(frame1),
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
     }
 
     @Test
     fun read44FrameWithTrashInTheMiddle() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
         val frame2 = Frame(0x5800, "4fca738ce2174708".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             RealDash.encode44Frame(frame1),
             "76b2e6e7d213".decodeHex(),
             RealDash.encode44Frame(frame2),
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
-        assertReadEquals(frame2, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
+        assertReadEquals(frame2, frameStream)
     }
 
     @Test
     fun read66MultipleFrames() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
         val frame2 = Frame(0x5800, "4fca738ce2174708".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             RealDash.encode66Frame(frame1),
             RealDash.encode66Frame(frame2),
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
-        assertReadEquals(frame2, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
+        assertReadEquals(frame2, frameStream)
     }
 
     @Test
     fun read66FrameWithTrashPrefix() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
-        val stream = FakeByteReader(
+        val bytesStream = FakeByteStream(
             "392c1b4c".decodeHex(),
             RealDash.encode66Frame(frame1),
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
+        val frameStream = RealDashStream(bytesStream)
+        assertReadEquals(frame1, frameStream)
     }
 
     @Test
     fun read66FrameWithTrashInTheMiddle() {
         val frame1 = Frame(0x5800, "f4080eef392c1b4c".decodeHex())
         val frame2 = Frame(0x5800, "4fca738ce2174708".decodeHex())
-        val stream = FakeByteReader(
+        val byteStream = FakeByteStream(
             RealDash.encode66Frame(frame1),
             "76b2e6e7d213".decodeHex(),
             RealDash.encode66Frame(frame2),
         )
 
-        val reader = RealDashReader(stream)
-        assertReadEquals(frame1, reader)
-        assertReadEquals(frame2, reader)
+        val frameStream = RealDashStream(byteStream)
+        assertReadEquals(frame1, frameStream)
+        assertReadEquals(frame2, frameStream)
     }
 
-    private fun assertReadEquals(expect: Any, reader: RealDashReader) {
-        val result = reader.read()
+    @Test
+    fun writeFrames() {
+        val frames = listOf(
+            Frame(0x5800, "f4080eef392c1b4c".decodeHex()),
+            Frame(0x5800, "4fca738ce2174708".decodeHex()),
+        )
+        assertWrite(frames)
+    }
+
+    @Test
+    fun writeFrameInParts() {
+        val frames = listOf(
+            Frame(0x5800, "f4080eef392c1b4c".decodeHex()),
+            Frame(0x5800, "4fca738ce2174708".decodeHex()),
+        )
+        assertWrite(frames, 2)
+    }
+
+    private fun assertReadEquals(expect: Any, stream: RealDashStream) {
+        val result = stream.read()
         val expectResult: Result<Frame> = when(expect) {
             is Frame -> Result.success(expect)
             is Throwable -> Result.failure(expect)
             else -> throw Exception("unexpected assertReadEquals expect type, must be Frame or Throwable")
         }
         assertEquals(expectResult, result)
+    }
+
+    private fun assertWrite(frames: List<Frame>, writeLimit: Int = 0) {
+        val expect = frames.map { RealDash.encode66Frame(it) }.reduce { A, B -> A+B }
+
+        val byteStream = FakeByteStream(4096, writeLimit)
+        val frameStream = RealDashStream(byteStream)
+        for (frame in frames) {
+            assertEquals(null, frameStream.write(frame))
+        }
+        assertEquals(expect.toHexString(), byteStream.buffer.toHexString())
     }
 }

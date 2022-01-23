@@ -1,7 +1,6 @@
 package org.techylines.serial_bridge
 
 import android.util.Log
-import java.io.Closeable
 import java.nio.ByteBuffer
 
 // Interface for things that can be closed. This does not directly match Java's Closeable()
