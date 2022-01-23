@@ -10,3 +10,7 @@ fun String.decodeHex(): ByteArray {
 }
 
 fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
+fun Collection<Byte>.toHexString() = joinToString("") { "%02x".format(it) }
+
+val Int.b: Byte get() = toByte()
+val Byte.s: String get() = toString(16)
