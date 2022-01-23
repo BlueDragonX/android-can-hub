@@ -275,3 +275,14 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
         calc66Checksum.reset()
     }
 }
+
+class RealDashProtocol : FrameProtocol {
+    override val name: String
+        get() = "RealDash"
+    override val description: String
+        get() = "Communicate with an the RealDash software dashboard."
+
+    override fun encodeStream(byteStream: ByteStream): FrameStream {
+        return RealDashStream(byteStream)
+    }
+}

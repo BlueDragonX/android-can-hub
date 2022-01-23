@@ -25,7 +25,7 @@ class FrameProtocolManager private constructor() {
         // Default singleton protocol manager.
         private val default = FrameProtocolManager()
         init {
-            //TODO: register built in protocols
+            default.register(RealDashProtocol())
         }
     }
 
