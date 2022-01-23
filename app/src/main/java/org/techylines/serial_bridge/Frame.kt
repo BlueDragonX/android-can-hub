@@ -16,8 +16,8 @@ data class Frame(
                 Arrays.equals(this.data, other.data)
     }
 
-    override fun hashCode() {
-        Objects.hash(id, data.toHexString())
+    override fun hashCode(): Int {
+        return Objects.hash(id, data.toHexString())
     }
 
     override fun toString(): String {
