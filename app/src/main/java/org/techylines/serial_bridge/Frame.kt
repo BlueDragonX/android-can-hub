@@ -5,7 +5,7 @@ import java.nio.ByteOrder
 import java.util.*
 
 // Holds a CAN frame. Data bytes are in network order.
-class Frame(
+data class Frame(
     var id: Long = 0,
     var data: ByteArray = byteArrayOf(),
 ) {
@@ -14,6 +14,10 @@ class Frame(
                 other is Frame &&
                 this.id == other.id &&
                 Arrays.equals(this.data, other.data)
+    }
+
+    override fun hashCode() {
+        Objects.hash(id, data.toHexString())
     }
 
     override fun toString(): String {
