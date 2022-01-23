@@ -1,27 +1,24 @@
 package org.techylines.serial_bridge
 
-import android.os.Parcelable
-import kotlinx.android.parcel.Parcelize
-import org.greenrobot.eventbus.EventBus
+import android.util.Log
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
-import java.io.Closeable
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.lang.RuntimeException
 import kotlin.concurrent.thread
 
 data class FrameBroadcast constructor (val deviceName: String, val frame: Frame)
 
 // Base class for all classes that sends and receives events on the bus.
-abstract class EventNode : Closeable {
-    // Return the name of the node. This should be unique.
-    abstract fun getName(): String
+interface EventNode : Closer {
+    // Return the name of the node. This should be unique among nodes.
+    val name: String
 
     // Listen for events from the node. The node sends events to the bus by calling onEvent.
-    abstract fun listen(onEvent: (FrameBroadcast)->Unit): Error?
+    // Return IllegalStateException if already called.
+    fun listen(onEvent: (FrameBroadcast)->Unit): Throwable?
 
     // Send an event to the node.
-    abstract fun send(event: FrameBroadcast): Throwable?
+    fun send(event: FrameBroadcast): Throwable?
 
     // Subscription method for the event bus implementation.
     @Subscribe(threadMode = ThreadMode.BACKGROUND)
@@ -31,34 +28,51 @@ abstract class EventNode : Closeable {
     }
 }
 
-class EventManager(val eventBus: EventBus = EventBus.getDefault()) {
-    private val nodes = mutableMapOf<String, EventNode>()
+class StreamNode(override val name: String, private val stream: FrameReaderWriter) : EventNode {
+    private var readThread: Thread? = null
 
-    // Register a node. Return an error if there is already a node with that name or the call to
-    // receive fails.
-    fun register(node: EventNode): Error? {
-        if (nodes.containsKey(node.getName())) {
-            return Error("event node ${node.getName()} exists")
+    override fun listen(onEvent: (FrameBroadcast) -> Unit): Throwable? {
+        if (readThread?.isAlive == true) {
+            return RuntimeException("stream already listening")
         }
-        nodes[node.getName()] = node
-        return node.listen {
-            eventBus.post(it)
+        readThread = thread {
+            while (!stream.isClosed()) {
+                val result = stream.read()
+                result.exceptionOrNull()?.let {
+                    Log.w(TAG, "frame read failed: $it")
+                }
+                result.getOrNull()?.let {
+                    onEvent(FrameBroadcast(name, it))
+                }
+            }
         }
+        return null
     }
 
-    fun unregister(node: EventNode): Boolean {
-        nodes[node.getName()]?.let {
-            it.close()
-            nodes.remove(node.getName())
-            return true
-        }
-        return false
+    override fun send(event: FrameBroadcast): Throwable? {
+        return stream.write(event.frame)
     }
 
-    fun unregister(nodeName: String): Boolean {
-        nodes[nodeName]?.let {
-            return unregister(it)
+    // Close the underlying stream and instruct the receiver thread to shut down. Does not block.
+    // An in progress read may prevent the thread from closing. Use join() to ensure the thread is
+    // stopped.
+    override fun close(): Throwable? {
+        return stream.close()
+    }
+
+    // Returns true if the thread is still alive.
+    override fun isClosed(): Boolean {
+        return readThread?.isAlive != true
+    }
+
+    // Join the underlying thread. Wait at most millis for the thread to join before returning. A
+    // value of 0 will wait infinitely. Return true if the thread is stopped.
+    fun join(millis: Long = 0): Boolean {
+        close()
+        readThread?.let {
+            it.join(millis)
+            return it.isAlive
         }
-        return false
+        return true
     }
 }
