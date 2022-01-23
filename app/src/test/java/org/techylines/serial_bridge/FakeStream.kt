@@ -120,3 +120,46 @@ class FakeByteReaderWriter(val buffer: MutableList<Byte>, private val rdBufferSi
         buffer.clear()
     }
 }
+
+class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameReaderWriter {
+    private var closed = false
+    private var position = 0
+
+    @Synchronized
+    override fun read(): Result<Frame?> {
+        if (isClosed()) {
+            return Result.failure(IOException("reader is closed"))
+        }
+        if (position >= frames.size) {
+            return Result.failure(IOException("buffer overrun"))
+        }
+        position++
+        return Result.success(frames[position-1])
+    }
+
+    @Synchronized
+    override fun write(frame: Frame): Throwable? {
+        if (isClosed()) {
+            return IOException("writer is closed")
+        }
+        frames.add(frame)
+        return null
+    }
+
+    @Synchronized
+    override fun close(): Throwable? {
+        closed = true
+        return null
+    }
+
+    @Synchronized
+    override fun isClosed(): Boolean {
+        return closed
+    }
+
+    @Synchronized
+    fun rewind() {
+        position = 0
+        closed = false
+    }
+}
