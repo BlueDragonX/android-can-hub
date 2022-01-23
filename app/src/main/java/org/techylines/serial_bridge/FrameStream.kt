@@ -18,4 +18,4 @@ interface FrameWriter : Closer {
 }
 
 // Interface for objects that read and write frames to a stream.
-interface FrameReaderWriter : FrameReader, FrameWriter
+interface FrameStream : FrameReader, FrameWriter

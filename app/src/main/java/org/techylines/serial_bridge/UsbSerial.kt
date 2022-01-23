@@ -43,10 +43,12 @@ class UsbSerialConfig(
 }
 
 // USB serial device. Allows reading and writing to a serial device.
-class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialConfig, val manager: UsbSerialManager) :
-    ByteStream() {
+class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialConfig, val manager: UsbSerialManager) : ByteStream {
+    private val iter = ByteReaderIterator(this)
+    override val readBufferSize: Int
+        get() = port.readEndpoint.maxPacketSize
 
-    override fun getName(): String {
+    fun getName(): String {
         return port.device.deviceName
     }
 
@@ -66,28 +68,28 @@ class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialCon
     }
 
     // Write bytes to the device.
-    override fun write(bytes: ByteArray): Throwable? = runCatching {
+    override fun write(bytes: ByteArray): Result<Int> = runCatching {
         port.write(bytes, 0)
-    }.exceptionOrNull()
-
-    override fun makeReadBuffer(): ByteArray {
-        return ByteArray(port.readEndpoint.maxPacketSize)
-    }
-
-    // Return true if the device is open.
-    override fun isOpen(): Boolean {
-        return port.isOpen
+        bytes.size
     }
 
     // Close the device.
-    override fun close() {
+    override fun close(): Throwable? = runCatching{
         if (port.isOpen) {
             port.close()
         }
         manager.serialDevices[port.device.deviceName]?.let {
             manager.serialDevices.remove(port.device.deviceName)
         }
+        null
+    }.exceptionOrNull()
+
+    // Return true if the device is open.
+    override fun isClosed(): Boolean {
+        return !port.isOpen
     }
+
+    override fun iterator(): Iterator<Byte> = iter
 }
 
 // Manages USB serial devices.

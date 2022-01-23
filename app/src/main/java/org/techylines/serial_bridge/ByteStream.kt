@@ -17,18 +17,19 @@ interface Closer {
 
 // Interface for objects that read bytes from a stream.
 interface ByteReader : Closer, Iterable<Byte> {
+    // Return the ideal read buffer size in bytes. 4096 is the default.
+    val readBufferSize: Int
+        get() = 4096
+
     // Read bytes into the provided buffer. Return an error on failure or the number
     // of bytes read into the buffer. Timeouts are not errors. If a timeout occurs then no bytes
     // are read into the buffer and 0 is returned.
     fun read(bytes: ByteArray): Result<Int>
-
-    // Return the ideal read buffer size in bytes. 4096 is the default.
-    fun getReadBufferSize(): Int { return 4096 }
 }
 
 // Iterator which returns bytes from a ByteReader.
 class ByteReaderIterator(private val reader: ByteReader) : Iterator<Byte> {
-    private val buffer: ByteBuffer = ByteBuffer.allocate(reader.getReadBufferSize())
+    private val buffer: ByteBuffer = ByteBuffer.allocate(reader.readBufferSize)
 
     init {
         buffer.limit(0)
@@ -72,24 +73,4 @@ interface ByteWriter : Closer {
 }
 
 // Interface for objects that read and write bytes to a stream.
-interface ByteReaderWriter : ByteReader, ByteWriter
-
-// General stream interface.
-abstract class ByteStream : Closeable {
-    // Return the name of the stream. This should be unique.
-    abstract fun getName(): String
-
-    // Read bytes from the stream.
-    abstract fun read(bytes: ByteArray): Result<Int>
-
-    // Write bytes to the stream.
-    abstract fun write(bytes: ByteArray): Throwable?
-
-    // Construct a read buffer of an ideal size.
-    open fun makeReadBuffer(): ByteArray {
-        return ByteArray(4096)
-    }
-
-    // Return true if the stream is open.
-    abstract fun isOpen(): Boolean
-}
+interface ByteStream : ByteReader, ByteWriter

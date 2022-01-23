@@ -28,7 +28,7 @@ interface EventNode : Closer {
     }
 }
 
-class StreamNode(override val name: String, private val stream: FrameReaderWriter) : EventNode {
+class StreamNode(override val name: String, private val stream: FrameStream) : EventNode {
     private var readThread: Thread? = null
 
     override fun listen(onEvent: (FrameBroadcast) -> Unit): Throwable? {

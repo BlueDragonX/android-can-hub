@@ -4,7 +4,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 
 // Reads from a ByteArray. Closes when it reaches the end of the array.
-class FakeByteReader(val buffer: ByteArray, private val rdBufferSize: Int = 4096) : ByteReader {
+class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4096) : ByteReader {
     private var position: Int = 0
     private val iter = ByteReaderIterator(this)
 
@@ -24,10 +24,6 @@ class FakeByteReader(val buffer: ByteArray, private val rdBufferSize: Int = 4096
         return Result.success(readSize)
     }
 
-    override fun getReadBufferSize(): Int {
-        return rdBufferSize
-    }
-
     override fun close(): Throwable? {
         position = buffer.size
         return null
@@ -43,10 +39,11 @@ class FakeByteReader(val buffer: ByteArray, private val rdBufferSize: Int = 4096
 }
 
 // Reads and writes to an internal buffer. Does not close until calling close.
-class FakeByteReaderWriter(val buffer: MutableList<Byte>, private val rdBufferSize: Int = 4096) : ByteReaderWriter {
+class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize: Int = 4096) : ByteStream {
     private var position: Int = 0
     private var closed = false
     private val iter = ByteReaderIterator(this)
+
 
     val bytes: ByteArray
         @Synchronized get() {
@@ -76,10 +73,6 @@ class FakeByteReaderWriter(val buffer: MutableList<Byte>, private val rdBufferSi
             position++
         }
         return Result.success(readSize)
-    }
-
-    override fun getReadBufferSize(): Int {
-        return rdBufferSize
     }
 
     @Synchronized
@@ -121,7 +114,7 @@ class FakeByteReaderWriter(val buffer: MutableList<Byte>, private val rdBufferSi
     }
 }
 
-class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameReaderWriter {
+class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameStream {
     private var closed = false
     private var position = 0
 
