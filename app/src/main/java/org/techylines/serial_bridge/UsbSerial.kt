@@ -2,11 +2,20 @@ package org.techylines.serial_bridge
 
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.os.Parcelable
 import android.util.Log
 import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
+import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.ExperimentalSerializationApi
 import java.util.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
+import kotlinx.serialization.json.encodeToStream
+import java.io.InputStream
+import java.io.OutputStream
 
 private object UsbSerial {
     private val prober: UsbSerialProber
@@ -21,7 +30,7 @@ private object UsbSerial {
     // Consistently generate a USB serial device ID from various sources.
     fun getId(vendorId: Int, productId: Int, serialNumber: String) = Objects.hash(vendorId, productId, serialNumber)
     fun getId(usbDevice: UsbDevice) = getId(usbDevice.vendorId, usbDevice.productId, usbDevice.serialNumber ?: "")
-    fun getId(usbConfig: UsbSerialConfig) = getId(usbConfig.vendorId, usbConfig.productId, usbConfig.serialNumber ?: "")
+    fun getId(usbDeviceId: UsbDeviceId) = getId(usbDeviceId.vendorId, usbDeviceId.productId, usbDeviceId.serialNumber ?: "")
 
     // Get a serial port for a USB device. Return null if the USB device is not supported.
     fun getSerialPort(usbDevice: UsbDevice): UsbSerialPort? {
@@ -39,21 +48,63 @@ private object UsbSerial {
     }
 }
 
-// Holds USB serial device configuration for connected and disconnected devices.
-data class UsbSerialConfig(
+// Holds USB device identification.
+@Parcelize
+@Serializable
+data class UsbDeviceId (
     val vendorId: Int,
     val productId: Int,
-    val serialNumber: String?,	// The device serial number if available.
-    val serialConfig: SerialConfig,
+    val serialNumber: String?,
+) : Parcelable {
+    constructor(device: UsbDevice) : this(device.vendorId, device.productId, device.serialNumber)
+}
+
+// Holds USB serial device configuration for connected and disconnected devices.
+@Parcelize
+@Serializable
+data class UsbSerialConfig(
+    // Device identification.
+    val usbDeviceId: UsbDeviceId,
+    // Serial connection config.
+    var serialConfig: SerialConfig,
+    // Stream and connectivity config.
     val autoConnect: Boolean,
     val protocolName: String,	// The name of the protocol to use with this device.
-) {
+) : Parcelable {
     // Return the actual protocol associated
     val protocol: FrameProtocol?
         get() = FrameProtocolManager.default.getProtocol(protocolName)
 
     constructor(usbDevice: UsbDevice, serialConfig: SerialConfig, autoConnect: Boolean, protocolName: String) :
-            this(usbDevice.vendorId, usbDevice.productId, usbDevice.serialNumber, serialConfig, autoConnect, protocolName)
+            this(UsbDeviceId(usbDevice), serialConfig, autoConnect, protocolName)
+}
+
+// Wraps a UsbSerialPort in a ByteStream interface.
+class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
+    override val readBufferSize: Int
+        get() = serialPort.readEndpoint.maxPacketSize
+    private val iter = ByteReaderIterator(this)
+
+    override fun read(bytes: ByteArray): Result<Int> = runCatching {
+        serialPort.read(bytes, 0)
+    }
+
+    override fun write(bytes: ByteArray): Result<Int> = runCatching {
+        serialPort.write(bytes, 0)
+        bytes.size
+    }
+
+    override fun close(): Error? = runCatching{
+        if (serialPort.isOpen) {
+            serialPort.close()
+        }
+    }.errorOrNull()
+
+    override fun isClosed(): Boolean {
+        return !serialPort.isOpen
+    }
+
+    override fun iterator(): Iterator<Byte> = iter
 }
 
 class UsbSerialDevice(config: UsbSerialConfig) {
@@ -71,7 +122,7 @@ class UsbSerialDevice(config: UsbSerialConfig) {
     }
 
     val id: Int
-        get() = UsbSerial.getId(config)
+        get() = UsbSerial.getId(config.usbDeviceId)
     private var serialPort: UsbSerialPort? = null
 
     val state: State
@@ -131,34 +182,7 @@ class UsbSerialDevice(config: UsbSerialConfig) {
     }
 }
 
-// Wraps a UsbSerialPort in a ByteStream interface.
-class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
-    override val readBufferSize: Int
-        get() = serialPort.readEndpoint.maxPacketSize
-    private val iter = ByteReaderIterator(this)
-
-    override fun read(bytes: ByteArray): Result<Int> = runCatching {
-        serialPort.read(bytes, 0)
-    }
-
-    override fun write(bytes: ByteArray): Result<Int> = runCatching {
-        serialPort.write(bytes, 0)
-        bytes.size
-    }
-
-    override fun close(): Error? = runCatching{
-        if (serialPort.isOpen) {
-            serialPort.close()
-        }
-    }.errorOrNull()
-
-    override fun isClosed(): Boolean {
-        return !serialPort.isOpen
-    }
-
-    override fun iterator(): Iterator<Byte> = iter
-}
-
+// Manages connected USB serial devices.
 class UsbSerialManager(private val usbManager: UsbManager) {
     private val deviceMap = mutableMapOf<Int, UsbSerialDevice>()
 
@@ -241,4 +265,32 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     fun detach(usbDevice: UsbDevice) {
         deviceMap[UsbSerial.getId(usbDevice)]?.detach()
     }
+
+    // Load configured USB serial device from a config file.
+    @ExperimentalSerializationApi
+    fun load(file: InputStream): Error? = runCatching {
+        val usbSerialConfigList = Json.decodeFromStream<List<UsbSerialConfig>>(file)
+        for (config in usbSerialConfigList) {
+            deviceMap[UsbSerial.getId(config.usbDeviceId)] = UsbSerialDevice(config)
+        }
+        for (usbDevice in usbManager.deviceList.values) {
+            deviceMap[UsbSerial.getId(usbDevice)]?.let {
+                attach(usbDevice)?.let {
+                    Log.e(TAG, "failed to attach previously configured device ${usbDevice.deviceName}")
+                    Log.e(TAG, "  manufacturer_name=${usbDevice.manufacturerName}")
+                    Log.e(TAG, "  product_name=${usbDevice.productName}")
+                    Log.e(TAG, "  vendor_id=${usbDevice.vendorId}")
+                    Log.e(TAG, "  product_id=${usbDevice.productId}")
+                    Log.e(TAG, "  serial_number=${usbDevice.serialNumber}")
+                }
+            }
+        }
+    }.errorOrNull()
+
+    // Save configured USB serial devices to a config file.
+    @ExperimentalSerializationApi
+    fun save(file: OutputStream): Error? = runCatching {
+        val usbSerialConfigList = deviceMap.values.map{it.config}
+        Json.encodeToStream(usbSerialConfigList, file)
+    }.errorOrNull()
 }
