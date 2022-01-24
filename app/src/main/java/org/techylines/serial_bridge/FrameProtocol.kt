@@ -23,7 +23,7 @@ class FrameProtocolManager private constructor() {
 
     companion object {
         // Default singleton protocol manager.
-        private val default = FrameProtocolManager()
+        val default = FrameProtocolManager()
         init {
             default.register(RealDashProtocol())
         }

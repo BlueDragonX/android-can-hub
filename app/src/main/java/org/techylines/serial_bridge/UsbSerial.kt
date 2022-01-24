@@ -2,136 +2,244 @@ package org.techylines.serial_bridge
 
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
-import android.os.Parcelable
+import android.util.Log
 import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
-import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import kotlinx.parcelize.Parcelize
-import java.io.IOException
+import java.lang.Exception
+import java.util.*
 
-// Configuration for USB serial devices.
-@Parcelize
-class UsbSerialConfig(
-    var baudRate: Int = 115200,
-    var dataBits: DataBits = DataBits.DATABITS_8,
-    var stopBits: StopBits = StopBits.STOPBITS_1,
-    var parity: Parity = Parity.PARITY_NONE,
-    var dtr: Boolean = false,
-    var rts: Boolean = false): Parcelable {
+private object UsbSerial {
+    private val prober: UsbSerialProber
 
-    enum class DataBits(val value: Int) {
-        DATABITS_5(5),
-        DATABITS_6(6),
-        DATABITS_7(7),
-        DATABITS_8(8),
+    init {
+        val probeTable = UsbSerialProber.getDefaultProbeTable()
+        // Add other supported USB devices here.
+        probeTable.addProduct(0x03EB, 0x802B, CdcAcmSerialDriver::class.java) // SAME51
+        prober = UsbSerialProber(probeTable)
     }
 
-    enum class Parity(val value: Int) {
-        PARITY_NONE(0),
-        PARITY_ODD(1),
-        PARITY_EVEN(2),
-        PARITY_MARK(3),
-        PARITY_SPACE(4),
-    }
+    // Consistently generate a USB serial device ID from various sources.
+    fun getId(vendorId: Int, productId: Int, serialNumber: String) = Objects.hash(vendorId, productId, serialNumber)
+    fun getId(usbDevice: UsbDevice) = getId(usbDevice.vendorId, usbDevice.productId, usbDevice.serialNumber ?: "")
+    fun getId(usbConfig: UsbSerialConfig) = getId(usbConfig.vendorId, usbConfig.productId, usbConfig.serialNumber ?: "")
 
-    enum class StopBits(val value: Int) {
-        STOPBITS_1(1),
-        STOPBITS_1_5(3),
-        STOPBITS_2(2),
+    // Get a serial port for a USB device. Return null if the USB device is not supported.
+    fun getSerialPort(usbDevice: UsbDevice): UsbSerialPort? {
+        val driver = prober.probeDevice(usbDevice)
+        if (driver == null) {
+            Log.w(TAG, "USB device ${usbDevice.deviceName} not supported by serial driver")
+            return null
+        }
+        val port = driver.ports[0]
+        if (port == null) {
+            Log.w(TAG, "USB device ${usbDevice.deviceName} has no ports")
+            return null
+        }
+        return port
     }
 }
 
-// USB serial device. Allows reading and writing to a serial device.
-class UsbSerialDevice(internal val port: UsbSerialPort, val config: UsbSerialConfig, val manager: UsbSerialManager) : ByteStream {
-    private val iter = ByteReaderIterator(this)
+// Holds USB serial device configuration for connected and disconnected devices.
+data class UsbSerialConfig(
+    val vendorId: Int,
+    val productId: Int,
+    val serialNumber: String?,	// The device serial number if available.
+    val serialConfig: SerialConfig,
+    val autoConnect: Boolean,
+    val protocolName: String,	// The name of the protocol to use with this device.
+) {
+    // Return the actual protocol associated
+    val protocol: FrameProtocol?
+        get() = FrameProtocolManager.default.getProtocol(protocolName)
+
+    constructor(usbDevice: UsbDevice, serialConfig: SerialConfig, autoConnect: Boolean, protocolName: String) :
+            this(usbDevice.vendorId, usbDevice.productId, usbDevice.serialNumber, serialConfig, autoConnect, protocolName)
+}
+
+class UsbSerialDevice(config: UsbSerialConfig) {
+    var config: UsbSerialConfig
+        private set
+
+    init {
+        this.config = config
+    }
+
+    enum class State {
+        ATTACHED,	// device is attached but not connected; may not be configured
+        DETACHED,	// device is detached and has a configuration
+        CONNECTED,  // device is connected
+    }
+
+    val id: Int
+        get() = UsbSerial.getId(config)
+    private var serialPort: UsbSerialPort? = null
+
+    val state: State
+        get() {
+            return when (serialPort?.isOpen) {
+                true -> State.CONNECTED
+                false -> State.ATTACHED
+                null -> State.DETACHED
+            }
+        }
+
+    internal fun attach(serialPort: UsbSerialPort) {
+        this.serialPort = serialPort
+    }
+
+    internal fun detach() {
+        disconnect()
+        serialPort = null
+    }
+
+    internal fun connect(usbManager: UsbManager): Result<FrameStream> = runCatching {
+        val protocol = config.protocol ?: throw Exception("protocol ${config.protocolName} not found")
+
+        serialPort?.let {
+            if (it.isOpen) {
+                throw Exception("USB device already connected")
+            }
+            val con = usbManager.openDevice(it.device)
+                ?: throw Exception("failed to open USB device ${it.device?.deviceName}")
+
+            it.open(con)
+            configureSerialPort()
+            protocol.encodeStream(UsbSerialStream(serialPort!!))
+        } ?: throw Exception("USB device not attached")
+    }
+
+    internal fun disconnect() {
+        serialPort?.close()
+    }
+
+    internal fun reconfigure(config: UsbSerialConfig) {
+        this.config = config
+        configureSerialPort()
+    }
+
+    private fun configureSerialPort() {
+        serialPort?.let {
+            it.setParameters(
+                config.serialConfig.baudRate,
+                config.serialConfig.dataBits.value,
+                config.serialConfig.stopBits.value,
+                config.serialConfig.parity.value,
+            )
+            it.dtr = config.serialConfig.dtr
+            it.rts = config.serialConfig.rts
+        }
+    }
+}
+
+// Wraps a UsbSerialPort in a ByteStream interface.
+class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
     override val readBufferSize: Int
-        get() = port.readEndpoint.maxPacketSize
+        get() = serialPort.readEndpoint.maxPacketSize
+    private val iter = ByteReaderIterator(this)
 
-    fun getName(): String {
-        return port.device.deviceName
-    }
-
-    // Return the USB device that backs this serial device.
-    fun getDevice(): UsbDevice {
-        return port.device
-    }
-
-    // Return the driver used to ope the serial device.
-    fun getDriver(): UsbSerialDriver {
-        return port.driver
-    }
-
-    // Read bytes from the device.
     override fun read(bytes: ByteArray): Result<Int> = runCatching {
-        port.read(bytes, 0)
+        serialPort.read(bytes, 0)
     }
 
-    // Write bytes to the device.
     override fun write(bytes: ByteArray): Result<Int> = runCatching {
-        port.write(bytes, 0)
+        serialPort.write(bytes, 0)
         bytes.size
     }
 
-    // Close the device.
     override fun close(): Throwable? = runCatching{
-        if (port.isOpen) {
-            port.close()
+        if (serialPort.isOpen) {
+            serialPort.close()
         }
-        manager.serialDevices[port.device.deviceName]?.let {
-            manager.serialDevices.remove(port.device.deviceName)
-        }
-        null
     }.exceptionOrNull()
 
-    // Return true if the device is open.
     override fun isClosed(): Boolean {
-        return !port.isOpen
+        return !serialPort.isOpen
     }
 
     override fun iterator(): Iterator<Byte> = iter
 }
 
-// Manages USB serial devices.
-class UsbSerialManager(val usbManager: UsbManager) {
-    internal val serialDevices: MutableMap<String, UsbSerialDevice> = mutableMapOf()
-    private var prober: UsbSerialProber? = null
+class UsbSerialManager(private val usbManager: UsbManager) {
+    private val deviceMap = mutableMapOf<Int, UsbSerialDevice>()
 
-    init {
-        val probeTable = UsbSerialProber.getDefaultProbeTable()
-        probeTable.addProduct(0x03EB, 0x802B, CdcAcmSerialDriver::class.java) // SAME51
-        prober = UsbSerialProber(probeTable)
+    val devices: List<UsbSerialDevice>
+        get() = deviceMap.values.toList()
+
+    // Get a USB serial device by its ID. Return null if the device is not
+    // configured in the manager.
+    fun getDevice(id: Int): UsbSerialDevice? {
+        return deviceMap[id]
     }
 
-    // Open a USB connection. Returns an error if the device was already open or on failure.
-    fun open(device: UsbDevice, config: UsbSerialConfig): Result<UsbSerialDevice> = runCatching {
-        val driver = prober?.probeDevice(device) ?:
-            throw IOException("USB device ${device.deviceName} not supported by serial driver")
-        val port = driver.ports[0] ?:
-            throw IOException("USB device ${device.deviceName} has no ports")
-        val con = usbManager.openDevice(device) ?:
-            throw IOException("failed to open USB device ${device.deviceName}")
-        port.open(con)
-        port.setParameters(config.baudRate, config.dataBits.value, config.stopBits.value, config.parity.value)
-        port.dtr = config.dtr
-        port.rts = config.rts
-        val serialDevice = UsbSerialDevice(port, config, this)
-        serialDevices[device.deviceName] = serialDevice
-        serialDevice
+    // Get the USB serial device associated with the given USB device. Return null if the
+    // device is not configured in the manager.
+    fun getDevice(usbDevice: UsbDevice): UsbSerialDevice? {
+        return getDevice(UsbSerial.getId(usbDevice))
     }
 
-    // Close a device.
-    fun close(device: UsbDevice): Boolean {
-        serialDevices[device.deviceName]?.let {
-            // This will remove the device from the manager as well.
-            it.close()
-            return true
+    // Configure (or reconfigure) a USB device in the manager. This will not change the operating
+    // configuration of a connected device. It will need to be reconnected to pick up the new
+    // config. Return an error if the device is not supported.
+    fun configure(usbDevice: UsbDevice, serialConfig: SerialConfig, autoConnect: Boolean, protocol: String): Result<UsbSerialDevice> = runCatching {
+        val id = UsbSerial.getId(usbDevice)
+        val config = UsbSerialConfig(usbDevice, serialConfig, autoConnect,  protocol)
+
+        deviceMap[id]?.let {
+            it.reconfigure(config)
+            it
+        } ?: run {
+            val serialPort = UsbSerial.getSerialPort(usbDevice) ?:
+                throw Exception("device is not supported deviceName=\"${usbDevice.deviceName}\" vendor_id=${usbDevice.vendorId} product_id=${usbDevice.productId}")
+            val serialDevice = UsbSerialDevice(config)
+            serialDevice.attach(serialPort)
+            deviceMap[id] = serialDevice
+            serialDevice
         }
-        return false
     }
 
-    // Return a list of open devices.
-    fun openDevices() : Collection<UsbSerialDevice> {
-        return serialDevices.values
+    // Remove a USB serial device from the manager. The device will be disconnected if
+    // necessary. Returns an error on disconnect failure. This is idempotent - return null if the
+    // device does not exist.
+    fun remove(id: Int) {
+        deviceMap[id]?.let {
+            it.disconnect()
+            deviceMap.remove(id)
+        }
+    }
+
+    fun remove(usbDevice: UsbDevice) {
+        remove(UsbSerial.getId(usbDevice))
+    }
+
+    // Connect a configured device. Returns an error on failure or if the device is not configured.
+    fun connect(usbDevice: UsbDevice): Result<FrameStream> {
+        val id = UsbSerial.getId(usbDevice)
+        return deviceMap[id]?.connect(usbManager) ?:
+            throw Exception("USB device not configured")
+    }
+
+    // Disconnect a device.
+    fun disconnect(usbDevice: UsbDevice) {
+        deviceMap[UsbSerial.getId(usbDevice)]?.disconnect()
+    }
+
+    // Attach a device. Return an error if the device is not configured. Attached devices are
+    // connected automatically if they have been configured.
+    fun attach(usbDevice: UsbDevice): Throwable? {
+        val id = UsbSerial.getId(usbDevice)
+        deviceMap[id]?.let {
+            val device = it
+            UsbSerial.getSerialPort(usbDevice)?.let {
+                device.attach(it)
+            } ?: return Exception("USB device not supported")
+        } ?: return Exception("USB device not configured")
+        return null
+    }
+
+    // Detach an attached or connected device. Disconnects the device if necessary. This is
+    // idempotent - detaching an already detached device will return null.
+    fun detach(usbDevice: UsbDevice) {
+        deviceMap[UsbSerial.getId(usbDevice)]?.detach()
     }
 }

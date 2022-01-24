@@ -120,12 +120,12 @@ class MainActivity : AppCompatActivity() {
         usbManager?.requestPermission(device, pendingIntent)
     }
 
-    private fun loadSerialConfig(device: UsbDevice): UsbSerialConfig? {
+    private fun loadSerialConfig(device: UsbDevice): SerialConfig? {
         // TODO: Implement a storage system of some flavor.
-        return UsbSerialConfig()
+        return SerialConfig()
     }
 
-    private fun saveSerialConfig(device: UsbDevice, config: UsbSerialConfig)  {
+    private fun saveSerialConfig(device: UsbDevice, config: SerialConfig)  {
         // TODO: Implement a storage system of some flavor.
     }
 
