@@ -1,5 +1,8 @@
 package org.techylines.serial_bridge
 
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.runBlocking
+
 // Reads from a ByteArray. Closes when it reaches the end of the array.
 class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4096) : ByteReader {
     private var position: Int = 0
@@ -94,20 +97,23 @@ class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize:
     }
 }
 
-class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameStream {
+class FakeFrameStream(val read: MutableList<Frame>) : FrameStream {
     private var closed = false
     private var position = 0
+    val written = mutableListOf<Frame>()
+
+    constructor() : this(mutableListOf())
 
     @Synchronized
     override fun read(): Result<Frame?> {
         if (isClosed()) {
             return Result.failure(StreamError("reader is closed"))
         }
-        if (position >= frames.size) {
+        if (position >= read.size) {
             return Result.failure(StreamError("buffer overrun"))
         }
         position++
-        return Result.success(frames[position-1])
+        return Result.success(read[position-1])
     }
 
     @Synchronized
@@ -115,7 +121,7 @@ class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameStream {
         if (isClosed()) {
             return StreamError("writer is closed")
         }
-        frames.add(frame)
+        written.add(frame)
         return null
     }
 
@@ -126,6 +132,36 @@ class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameStream {
     }
 
     @Synchronized
+    override fun isClosed(): Boolean {
+        return closed
+    }
+}
+
+class ChannelFrameStream(readBufferSize: Int = 100, writeBufferSize: Int = 100) : FrameStream {
+    val readChannel = Channel<Frame>(readBufferSize)
+    val writeChannel = Channel<Frame>(writeBufferSize)
+    private var closed = false
+
+    override fun read(): Result<Frame?> {
+        val result = readChannel.tryReceive()
+        val ex = result.exceptionOrNull()
+        if (ex != null) {
+            return Result.failure(result.exceptionOrNull()!!)
+        }
+        return Result.success(result.getOrNull())
+    }
+
+    override fun write(frame: Frame): Error? = runBlocking {
+        writeChannel.send(frame)
+        null
+    }
+
+    override fun close(): Error? {
+        closed = true
+        writeChannel.close()
+        return null
+    }
+
     override fun isClosed(): Boolean {
         return closed
     }
