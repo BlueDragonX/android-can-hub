@@ -2,9 +2,11 @@ package org.techylines.serial_bridge
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 
 // Configuration for serial connections.
 @Parcelize
+@Serializable
 data class SerialConfig(
     var baudRate: Int = 115200,
     var dataBits: DataBits = DataBits.DATABITS_8,
