@@ -4,7 +4,6 @@ import android.util.Log
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.text.ParseException
 import java.util.zip.CRC32
 import java.util.zip.Checksum
 
@@ -118,7 +117,7 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
                 return Result.success(it)
             }
             when (val error = result.exceptionOrNull()) {
-                is ParseException -> {
+                is ParseError -> {
                     Log.d(TAG, "$error")
                 }
                 is Throwable -> {
@@ -129,18 +128,18 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
         return Result.failure(IOException("reader is closed"))
     }
 
-    override fun write(frame: Frame): Throwable? {
+    override fun write(frame: Frame): Error? {
         var position = 0
         val bytes = RealDash.encode66Frame(frame)
         while (position < bytes.size) {
             val result = byteStream.write(bytes.sliceArray(IntRange(position, bytes.size-1)))
             val written = result.getOrNull()
-            position += written ?: return result.exceptionOrNull()
+            position += written ?: return result.errorOrNull()
         }
         return null
     }
 
-    override fun close(): Throwable? {
+    override fun close(): Error? {
         return byteStream.close()
     }
 
@@ -148,7 +147,7 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
         return byteStream.isClosed()
     }
 
-    // Update internal Frame state with a byte. Return a ParseException on failure, a Frame if one has been
+    // Update internal Frame state with a byte. Return a ParseError on failure, a Frame if one has been
     // built, or null if no frame is yet available.
     private fun update(byte: Byte): Result<Frame?> {
         readSize++
@@ -167,7 +166,7 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
         return Result.success(null)
     }
 
-    private fun updateHeader(byte: Byte): Throwable? {
+    private fun updateHeader(byte: Byte): Error? {
         when (readSize) {
             // Parse header.
             1 -> {
@@ -183,20 +182,20 @@ open class RealDashStream(private val byteStream: ByteStream) : FrameStream {
                     }
                     else -> {
                         reset()
-                        return ParseException("unsupported frame type, byte[0]=${byte.s}", 0)
+                        return ParseError("unsupported frame type, byte[0]=${byte.s}")
                     }
                 }
             }
             2 -> {
                 if (byte != 0x33.b) {
                     reset()
-                    return ParseException("invalid frame header, byte[1]=${byte.s}", 0)
+                    return ParseError("invalid frame header, byte[1]=${byte.s}")
                 }
             }
             3 -> {
                 if (byte != 0x22.b) {
                     reset()
-                    return ParseException("invalid frame header, byte[2]=${byte.s}", 0)
+                    return ParseError("invalid frame header, byte[2]=${byte.s}")
                 }
             }
             4 -> {

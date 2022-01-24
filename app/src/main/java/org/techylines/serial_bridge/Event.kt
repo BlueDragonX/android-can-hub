@@ -15,10 +15,10 @@ interface EventNode : Closer {
 
     // Listen for events from the node. The node sends events to the bus by calling onEvent.
     // Return IllegalStateException if already called.
-    fun listen(onEvent: (FrameBroadcast)->Unit): Throwable?
+    fun listen(onEvent: (FrameBroadcast)->Unit): Error?
 
     // Send an event to the node.
-    fun send(event: FrameBroadcast): Throwable?
+    fun send(event: FrameBroadcast): Error?
 
     // Subscription method for the event bus implementation.
     @Subscribe(threadMode = ThreadMode.BACKGROUND)
@@ -31,9 +31,9 @@ interface EventNode : Closer {
 open class StreamNode(override val name: String, private val stream: FrameStream) : EventNode {
     private var readThread: Thread? = null
 
-    override fun listen(onEvent: (FrameBroadcast) -> Unit): Throwable? {
+    override fun listen(onEvent: (FrameBroadcast) -> Unit): Error? {
         if (readThread?.isAlive == true) {
-            return RuntimeException("stream already listening")
+            return StreamError("stream already listening")
         }
         readThread = thread {
             while (!stream.isClosed()) {
@@ -49,14 +49,14 @@ open class StreamNode(override val name: String, private val stream: FrameStream
         return null
     }
 
-    override fun send(event: FrameBroadcast): Throwable? {
+    override fun send(event: FrameBroadcast): Error? {
         return stream.write(event.frame)
     }
 
     // Close the underlying stream and instruct the receiver thread to shut down. Does not block.
     // An in progress read may prevent the thread from closing. Use join() to ensure the thread is
     // stopped.
-    override fun close(): Throwable? {
+    override fun close(): Error? {
         return stream.close()
     }
 

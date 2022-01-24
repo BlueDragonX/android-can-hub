@@ -6,7 +6,6 @@ import android.util.Log
 import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import java.lang.Exception
 import java.util.*
 
 private object UsbSerial {
@@ -94,19 +93,19 @@ class UsbSerialDevice(config: UsbSerialConfig) {
     }
 
     internal fun connect(usbManager: UsbManager): Result<FrameStream> = runCatching {
-        val protocol = config.protocol ?: throw Exception("protocol ${config.protocolName} not found")
-
         serialPort?.let {
+            val protocol = config.protocol ?: throw ProtocolError("protocol ${config.protocolName} not found", )
+
             if (it.isOpen) {
-                throw Exception("USB device already connected")
+                throw DeviceConnectedError(it.device)
             }
             val con = usbManager.openDevice(it.device)
-                ?: throw Exception("failed to open USB device ${it.device?.deviceName}")
+                ?: throw DeviceOpenError(it.device)
 
             it.open(con)
             configureSerialPort()
             protocol.encodeStream(UsbSerialStream(serialPort!!))
-        } ?: throw Exception("USB device not attached")
+        } ?: throw DeviceNotAttachedError()
     }
 
     internal fun disconnect() {
@@ -147,11 +146,11 @@ class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
         bytes.size
     }
 
-    override fun close(): Throwable? = runCatching{
+    override fun close(): Error? = runCatching{
         if (serialPort.isOpen) {
             serialPort.close()
         }
-    }.exceptionOrNull()
+    }.errorOrNull()
 
     override fun isClosed(): Boolean {
         return !serialPort.isOpen
@@ -190,7 +189,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
             it
         } ?: run {
             val serialPort = UsbSerial.getSerialPort(usbDevice) ?:
-                throw Exception("device is not supported deviceName=\"${usbDevice.deviceName}\" vendor_id=${usbDevice.vendorId} product_id=${usbDevice.productId}")
+                throw DeviceNotSupportedError(usbDevice)
             val serialDevice = UsbSerialDevice(config)
             serialDevice.attach(serialPort)
             deviceMap[id] = serialDevice
@@ -216,7 +215,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     fun connect(usbDevice: UsbDevice): Result<FrameStream> {
         val id = UsbSerial.getId(usbDevice)
         return deviceMap[id]?.connect(usbManager) ?:
-            throw Exception("USB device not configured")
+            throw DeviceNotConfiguredError(usbDevice)
     }
 
     // Disconnect a device.
@@ -226,14 +225,14 @@ class UsbSerialManager(private val usbManager: UsbManager) {
 
     // Attach a device. Return an error if the device is not configured. Attached devices are
     // connected automatically if they have been configured.
-    fun attach(usbDevice: UsbDevice): Throwable? {
+    fun attach(usbDevice: UsbDevice): Error? {
         val id = UsbSerial.getId(usbDevice)
         deviceMap[id]?.let {
             val device = it
             UsbSerial.getSerialPort(usbDevice)?.let {
                 device.attach(it)
-            } ?: return Exception("USB device not supported")
-        } ?: return Exception("USB device not configured")
+            } ?: return DeviceNotSupportedError(usbDevice)
+        } ?: return DeviceNotConfiguredError(usbDevice)
         return null
     }
 

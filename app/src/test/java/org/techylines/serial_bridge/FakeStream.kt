@@ -1,7 +1,5 @@
 package org.techylines.serial_bridge
 
-import java.io.IOException
-
 // Reads from a ByteArray. Closes when it reaches the end of the array.
 class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4096) : ByteReader {
     private var position: Int = 0
@@ -10,7 +8,7 @@ class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4
     @Synchronized
     override fun read(bytes: ByteArray): Result<Int> {
         if (isClosed()) {
-            return Result.failure(IOException("reader is closed"))
+            return Result.failure(StreamError("reader is closed"))
         }
         val remaining = buffer.size - position
         val readSize = if (remaining > bytes.size) bytes.size else remaining
@@ -21,7 +19,7 @@ class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4
         return Result.success(readSize)
     }
 
-    override fun close(): Throwable? {
+    override fun close(): Error? {
         position = buffer.size
         return null
     }
@@ -48,11 +46,11 @@ class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize:
     @Synchronized
     override fun read(bytes: ByteArray): Result<Int> {
         if (isClosed()) {
-            return Result.failure(IOException("reader is closed"))
+            return Result.failure(StreamError("reader is closed"))
         }
         val remaining = buffer.size - position
         if (remaining == 0) {
-            return Result.failure(IOException("buffer overrun"))
+            return Result.failure(StreamError("buffer overrun"))
         }
         val readSize = if (remaining > bytes.size) bytes.size else remaining
         for (i in 0 until readSize) {
@@ -65,7 +63,7 @@ class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize:
     @Synchronized
     override fun write(bytes: ByteArray): Result<Int> {
         if (isClosed()) {
-            return Result.failure(IOException("writer is closed"))
+            return Result.failure(StreamError("writer is closed"))
         }
         if (writeLimit <= 0 || bytes.size < writeLimit) {
             for (byte in bytes) {
@@ -81,7 +79,7 @@ class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize:
     }
 
     @Synchronized
-    override fun close(): Throwable? {
+    override fun close(): Error? {
         closed = true
         return null
     }
@@ -103,26 +101,26 @@ class FakeFrameReaderWriter(val frames: MutableList<Frame>) : FrameStream {
     @Synchronized
     override fun read(): Result<Frame?> {
         if (isClosed()) {
-            return Result.failure(IOException("reader is closed"))
+            return Result.failure(StreamError("reader is closed"))
         }
         if (position >= frames.size) {
-            return Result.failure(IOException("buffer overrun"))
+            return Result.failure(StreamError("buffer overrun"))
         }
         position++
         return Result.success(frames[position-1])
     }
 
     @Synchronized
-    override fun write(frame: Frame): Throwable? {
+    override fun write(frame: Frame): Error? {
         if (isClosed()) {
-            return IOException("writer is closed")
+            return StreamError("writer is closed")
         }
         frames.add(frame)
         return null
     }
 
     @Synchronized
-    override fun close(): Throwable? {
+    override fun close(): Error? {
         closed = true
         return null
     }

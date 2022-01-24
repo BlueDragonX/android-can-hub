@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 interface Closer {
     // Close the object. This is idempotent; calling this multiple times will not result in
     // an error. An error is only returned if the object is not closed after the call completes.
-    fun close(): Throwable?
+    fun close(): Error?
 
     // Return true if the object is closed. Should return true after the first call to close().
     fun isClosed(): Boolean
@@ -34,7 +34,7 @@ class ByteReaderIterator(private val reader: ByteReader) : Iterator<Byte> {
         buffer.limit(0)
     }
 
-    // Get the next element. Throws a NoSuchElementException if the reader is closed.
+    // Get the next element.
     override operator fun next(): Byte {
         return buffer.get()
     }

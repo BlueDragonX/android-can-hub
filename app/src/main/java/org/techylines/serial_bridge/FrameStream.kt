@@ -14,7 +14,7 @@ interface FrameReader : Closer {
 interface FrameWriter : Closer {
     // Write a frame. An error is returned on failure. Returns true if the frame was written or
     // false if it was discarded. Unsupported frames should be discarded.
-    fun write(frame: Frame): Throwable?
+    fun write(frame: Frame): Error?
 }
 
 // Interface for objects that read and write frames to a stream.
