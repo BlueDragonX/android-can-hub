@@ -207,6 +207,7 @@ class UsbSerialDevice(config: UsbSerialConfig) {
 // Manages connected USB serial devices.
 class UsbSerialManager(private val usbManager: UsbManager) {
     private val deviceMap = mutableMapOf<Int, UsbSerialDevice>()
+    private val deviceNameMap = mutableMapOf<String, Int>()
 
     val devices: List<UsbSerialDevice>
         get() = deviceMap.values.toList()
@@ -239,6 +240,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
             val serialDevice = UsbSerialDevice(config)
             serialDevice.attach(serialPort)
             deviceMap[id] = serialDevice
+            deviceNameMap[usbDevice.deviceName] = serialDevice.id
             serialDevice
         }
     }
@@ -271,21 +273,25 @@ class UsbSerialManager(private val usbManager: UsbManager) {
 
     // Attach a device. Return an error if the device is not configured. Attached devices are
     // connected automatically if they have been configured.
-    fun attach(usbDevice: UsbDevice): Error? {
+    fun attach(usbDevice: UsbDevice): Result<UsbSerialDevice> = runCatching {
+        Log.v(TAG, "manager: attach device ${usbDevice.deviceName}")
         val id = UsbSerial.getId(usbDevice)
         deviceMap[id]?.let {
-            val device = it
+            val serialDevice = it
             UsbSerial.getSerialPort(usbDevice)?.let {
-                device.attach(it)
-            } ?: return DeviceNotSupportedError(usbDevice)
-        } ?: return DeviceNotConfiguredError(usbDevice)
-        return null
+                serialDevice.attach(it)
+                deviceNameMap[usbDevice.deviceName] = serialDevice.id
+                serialDevice
+            } ?: throw DeviceNotSupportedError(usbDevice)
+        } ?: throw DeviceNotConfiguredError(usbDevice)
     }
 
     // Detach an attached or connected device. Disconnects the device if necessary. This is
     // idempotent - detaching an already detached device will return null.
     fun detach(usbDevice: UsbDevice) {
-        deviceMap[UsbSerial.getId(usbDevice)]?.detach()
+        deviceNameMap.remove(usbDevice.deviceName)?.let {
+            deviceMap[it]?.detach()
+        }
     }
 
     // Load configured USB serial device from a config file.
