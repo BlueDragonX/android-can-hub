@@ -13,7 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SerialBridge">
         <service
-            android:name=".BridgeService"
+            android:name=".FrameBusService"
             android:enabled="true"
             android:exported="true">
             <intent-filter>

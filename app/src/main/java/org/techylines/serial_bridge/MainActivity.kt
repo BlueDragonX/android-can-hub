@@ -15,27 +15,20 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import java.lang.StringBuilder
 
-const val TAG = "SerialBridge"
-
-const val ACTION_USB_DEVICE_READY = "org.techylines.action.USB_DEVICE_READY"
-const val ACTION_USB_DEVICE_PERMISSION = "org.techylines.action.USB_DEVICE_PERMISSION"
-const val ACTION_SERIAL_DEVICE_CONFIGURE = "org.techylines.action.SERIAL_DEVICE_CONFIGURE"
-const val ACTION_SERIAL_DEVICE_CONNECT = "org.techylines.action.SERIAL_DEVICE_CONNECT"
-const val EXTRA_USB_SERIAL_CONFIG = "org.techylines.EXTRA_USB_SERIAL_CONFIG"
-
 class MainActivity : AppCompatActivity() {
-    private var usbManager : UsbManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.v(TAG, "app create")
         super.onCreate(savedInstanceState)
-        usbManager = getSystemService(UsbManager::class.java)
 
         val broadcastFilter = IntentFilter()
-        broadcastFilter.addAction(ACTION_USB_DEVICE_PERMISSION)
-        broadcastFilter.addAction(ACTION_USB_DEVICE_READY)
+        broadcastFilter.addAction(ACTION_USB_SERIAL_DEVICE_CONFIGURE)
         registerReceiver(broadcastReceiver, broadcastFilter)
 
-        ContextCompat.startForegroundService(this, Intent(this, BridgeService::class.java))
+        if (App.service == null) {
+            Log.v(TAG, "create init service")
+            ContextCompat.startForegroundService(this, Intent(this, FrameBusService::class.java))
+        }
 
         showContent()
         onIntent(intent)
@@ -46,87 +39,31 @@ class MainActivity : AppCompatActivity() {
         unregisterReceiver(broadcastReceiver)
     }
 
+    private fun onUsbSerialConfigure(intent: Intent) {
+        val device : UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
+        App.service?.serialManager?.let {
+            //TODO: Build a UI for this.
+            it.configure(device, SerialConfig(), true, "RealDash")
+        }
+        intent.getParcelableExtra<PendingIntent>(EXTRA_PENDING_INTENT)?.let {
+            it.send()
+        }
+    }
+
     private fun onIntent(intent: Intent) {
         Log.v(TAG, "MainActivity received intent ${intent.action}")
         when (intent.action) {
             UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                // Forward USB attach intents to the service.
                 val device : UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                 device?.let {
-                    onUsbDeviceAttached(device)
+                    sendBroadcast(Intent(ACTION_USB_SERIAL_DEVICE_ATTACH).putExtra(UsbManager.EXTRA_DEVICE, device))
                 }
             }
-            ACTION_USB_DEVICE_PERMISSION -> {
-                val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                device?.let {
-                    onUsbDevicePermission(device)
-                }
-            }
-            ACTION_USB_DEVICE_READY -> {
-                val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                device?.let {
-                    onUsbDeviceReady(it)
-                }
+            ACTION_USB_SERIAL_DEVICE_CONFIGURE -> {
+                onUsbSerialConfigure(intent)
             }
         }
-    }
-
-    private fun onUsbDeviceAttached(device : UsbDevice) {
-        Log.i(TAG,"attach USB device ${device.deviceName}\n")
-        Log.i(TAG,"    manufacturer=\"${device.manufacturerName}\"")
-        Log.i(TAG,"    product=\"${device.productName}\"")
-        Log.i(TAG,"    vendor_id=${device.vendorId}")
-        Log.i(TAG,"    product_id=${device.productId}")
-
-        if (usbManager?.hasPermission(device) == true) {
-            val sendIntent = Intent(ACTION_USB_DEVICE_READY)
-            sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-            sendBroadcast(sendIntent)
-        } else {
-            requestUsbDevicePermission(device)
-        }
-    }
-
-    private fun onUsbDeviceReady(device : UsbDevice) {
-        Log.d(TAG, "USB device ${device.deviceName} ready")
-        val config = loadSerialConfig(device)
-        if (config == null) {
-            // ask for configuration
-            val sendIntent = Intent(ACTION_SERIAL_DEVICE_CONFIGURE)
-            sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-            sendBroadcast(sendIntent)
-        } else {
-            // connect the device
-            val sendIntent = Intent(ACTION_SERIAL_DEVICE_CONNECT)
-            sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-            sendIntent.putExtra(EXTRA_USB_SERIAL_CONFIG, config)
-            sendBroadcast(sendIntent)
-        }
-    }
-
-    private fun onUsbDevicePermission(device : UsbDevice) {
-        if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-            Log.i(TAG, "user granted permission to USB device ${device.deviceName}")
-            val sendIntent = Intent(ACTION_USB_DEVICE_READY)
-            sendIntent.putExtra(UsbManager.EXTRA_DEVICE, device)
-            sendBroadcast(sendIntent)
-        } else {
-            Log.i(TAG, "user denied permission to USB device ${device.deviceName}")
-        }
-    }
-
-    private fun requestUsbDevicePermission(device : UsbDevice) {
-        val pendingIntent =
-            PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_DEVICE_PERMISSION), PendingIntent.FLAG_IMMUTABLE)
-        usbManager?.requestPermission(device, pendingIntent)
-    }
-
-    private fun loadSerialConfig(device: UsbDevice): SerialConfig? {
-        // TODO: Implement a storage system of some flavor.
-        return SerialConfig()
-    }
-
-    private fun saveSerialConfig(device: UsbDevice, config: SerialConfig)  {
-        // TODO: Implement a storage system of some flavor.
     }
 
     private fun showContent() {
@@ -134,13 +71,13 @@ class MainActivity : AppCompatActivity() {
         val start: Button = findViewById(R.id.startButton)
         start.setOnClickListener {
             Log.v(TAG, "button starting service")
-            ContextCompat.startForegroundService(this, Intent(this, BridgeService::class.java))
+            ContextCompat.startForegroundService(this, Intent(this, FrameBusService::class.java))
         }
 
         val stop: Button = findViewById(R.id.stopButton)
         stop.setOnClickListener {
             Log.v(TAG, "button stopping service")
-            val intent  = Intent(this, BridgeService::class.java)
+            val intent  = Intent(this, FrameBusService::class.java)
             stopService(intent)
         }
 
