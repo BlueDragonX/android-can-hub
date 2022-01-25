@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -86,7 +87,13 @@ class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
     private val iter = ByteReaderIterator(this)
 
     override fun read(bytes: ByteArray): Result<Int> = runCatching {
-        serialPort.read(bytes, 0)
+        try {
+            serialPort.read(bytes, 0)
+        } catch (ex: IOException) {
+            // An IO error typically indicates that the device has been detached. Close the port.
+            serialPort.close()
+            throw ex
+        }
     }
 
     override fun write(bytes: ByteArray): Result<Int> = runCatching {
@@ -95,8 +102,15 @@ class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
     }
 
     override fun close(): Error? = runCatching{
-        if (serialPort.isOpen) {
-            serialPort.close()
+        try {
+            with (serialPort) {
+                if (this.isOpen) {
+                    this.close()
+                }
+            }
+        } catch (ex: IOException) {
+            // Ignore IO errors when closing the port.
+            Log.w(TAG, "error when closing USB serial port ${serialPort.device.deviceName}: ${ex}")
         }
     }.errorOrNull()
 
@@ -109,6 +123,9 @@ class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
 
 class UsbSerialDevice(config: UsbSerialConfig) {
     var config: UsbSerialConfig
+        private set
+    // The byte stream. Only set when the device is connected.
+    var stream: UsbSerialStream? = null
         private set
 
     init {
@@ -155,12 +172,17 @@ class UsbSerialDevice(config: UsbSerialConfig) {
 
             it.open(con)
             configureSerialPort()
-            protocol.encodeStream(UsbSerialStream(serialPort!!))
+            val byteStream = UsbSerialStream(serialPort!!)
+            stream = byteStream
+            protocol.encodeStream(byteStream)
         } ?: throw DeviceNotAttachedError()
     }
 
     internal fun disconnect() {
-        serialPort?.close()
+        stream?.let {
+            it.close()
+            stream = null
+        }
     }
 
     internal fun reconfigure(config: UsbSerialConfig) {
