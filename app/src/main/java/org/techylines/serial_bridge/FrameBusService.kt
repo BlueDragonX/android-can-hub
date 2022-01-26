@@ -84,6 +84,7 @@ class FrameBusService : Service() {
         }
         if (eventBus == null) {
             eventBus = FrameBus(scope)
+            scope.launch { eventBus?.add(HeartbeatStream(Frame(0x6000, "0000000000000000".decodeHex()), 1000)) }
             Log.v(TAG, "init event bus")
         }
 
