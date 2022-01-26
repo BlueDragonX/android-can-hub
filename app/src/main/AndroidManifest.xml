@@ -17,9 +17,6 @@
             android:name=".FrameBusService"
             android:enabled="true"
             android:exported="true">
-            <intent-filter>
-                <action android:name="org.techylines.action.USB_DEVICE_CONNECTED" />
-            </intent-filter>
         </service>
 
         <activity
