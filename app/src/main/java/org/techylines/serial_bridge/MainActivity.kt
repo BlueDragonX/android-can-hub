@@ -13,6 +13,7 @@ import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import java.lang.NullPointerException
 import java.lang.StringBuilder
 
 class MainActivity : AppCompatActivity() {
@@ -66,43 +67,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showContent() {
+    private fun showContent() = runCatching {
         setContentView(R.layout.activity_main)
-        val start: Button = findViewById(R.id.startButton)
-        start.setOnClickListener {
-            Log.v(TAG, "button starting service")
-            ContextCompat.startForegroundService(this, Intent(this, FrameBusService::class.java))
-        }
-
-        val stop: Button = findViewById(R.id.stopButton)
-        stop.setOnClickListener {
-            Log.v(TAG, "button stopping service")
-            val intent  = Intent(this, FrameBusService::class.java)
-            stopService(intent)
-        }
-
-        val refresh: Button = findViewById(R.id.refreshButton)
-        refresh.setOnClickListener {
-            val usbManager = getSystemService(UsbManager::class.java)
-            val text = StringBuilder()
-            if (usbManager.deviceList.size == 0) {
-                text.append("no devices connected")
-            }
-            for (device in usbManager.deviceList)  {
-                text.append("Manufacturer: ${device.value.manufacturerName}\n")
-                text.append("Product: ${device.value.productName}\n")
-                text.append("Device: ${device.value.deviceName}\n")
-                text.append("Class: ${device.value.deviceClass}\n")
-                text.append("Sub-Class: ${device.value.deviceSubclass}\n")
-                text.append("Protocol: ${device.value.deviceProtocol}\n")
-                text.append("Vendor ID: ${device.value.vendorId}\n")
-                text.append("Product ID: ${device.value.productId}\n")
-                text.append("\n")
-            }
-
-            val textView: TextView = findViewById(R.id.deviceListView)
-            textView.text = text.toString()
-        }
+        this.supportActionBar?.hide()
     }
 
     private var broadcastReceiver = object : BroadcastReceiver() {

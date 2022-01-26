@@ -139,7 +139,7 @@ class FrameBusService : Service() {
         return NotificationCompat.Builder(this, SERVICE_CHANNEL_ID)
             .setContentTitle("Serial Bridge Online")
             .setContentText("Bridging connected USB device.")
-            .setSmallIcon(R.drawable.ic_usb_plug)
+            .setSmallIcon(R.drawable.ic_service_foreground)
             .setContentIntent(pendingIntent)
             .build()
     }

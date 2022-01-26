@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Serial Bridge</string>
+    <string name="app_name">CAN Hub</string>
+    <string name="background_image">Background image.</string>
 </resources>
