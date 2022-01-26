@@ -37,6 +37,7 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
             try {
                 while (!stream.isClosed()) {
                     internalRead()
+                    yield()
                 }
             } finally {
                 stream.close()
@@ -48,8 +49,9 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
             val result = stream.read()
             if (result.isSuccess) {
                 result.getOrNull()?.let {
+                    Log.v(TAG, "frame read node_id=${id} frame=${it}")
                     frames.send(Event(id, it))
-                } ?: yield()
+                }
             } else {
                 Log.w(TAG, "frame read failed node_id=${id}: ${result.exceptionOrNull()?.message}")
             }
@@ -60,6 +62,7 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
                 stream.write(event.frame)?.let {
                     Log.w(TAG, "frame write failed node_id=${id}: ${it.message}")
                 }
+                yield()
             }
         }
 
