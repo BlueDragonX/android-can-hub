@@ -1,6 +1,7 @@
 package org.techylines.serial_bridge
 
 import android.hardware.usb.UsbDevice
+import android.util.Log
 
 // Base class for app errors.
 open class Error(message: String, cause: Throwable? = null) : Throwable(message, cause)
@@ -33,7 +34,7 @@ class StreamError(message: String) : Error(message)
 class ProtocolError(message: String) : Error(message)
 
 // Used to wrap non-Error throwables that were not haneld.
-class UnhandledError(cause: Throwable) : Error("unhandled error: ${cause.message}", cause)
+class UnhandledError(cause: Throwable) : Error("unhandled error: ${cause}", cause)
 
 // Upcast a Throwable to an error or wrap it in an UnhandledError.
 fun Throwable.toError(): Error {
