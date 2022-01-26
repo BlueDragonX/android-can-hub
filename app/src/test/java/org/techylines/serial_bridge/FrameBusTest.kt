@@ -1,8 +1,8 @@
 package org.techylines.serial_bridge
 
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,10 +95,13 @@ class FrameBusTest {
         bus.add(stream2)
         bus.add(stream3)
         bus.add(stream4)
-        delay(100)
+        yield()
+
         for (frame in frames) {
             stream1.readChannel.send(frame)
         }
+        yield()
+
         val actual2 = receiveN(stream2.writeChannel, 2)
         val actual3 = receiveN(stream3.writeChannel, 2)
         val actual4 = receiveN(stream4.writeChannel, 2)
@@ -125,16 +128,17 @@ class FrameBusTest {
         val stream4 = ChannelFrameStream()
 
         val bus = FrameBus(this)
-
         bus.add(stream1)
         bus.add(stream2)
         bus.add(stream3)
         bus.add(stream4)
-        delay(100)
+        yield()
 
         stream1.readChannel.send(frame1)
         stream2.readChannel.send(frame2)
         stream3.readChannel.send(frame3)
+        yield()
+
         val actual1 = receiveN(stream1.writeChannel, 2)
         val actual2 = receiveN(stream2.writeChannel, 2)
         val actual3 = receiveN(stream3.writeChannel, 2)
