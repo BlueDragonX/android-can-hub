@@ -1,23 +1,21 @@
 package org.techylines.serial_bridge
 
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import java.io.IOException
 import java.lang.Exception
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.ByteChannel
 import java.nio.channels.ServerSocketChannel
 
+enum class SocketProtocol { TCP, UDP }
+
 // Base class for all socket based servers. Listens for connections and returns ByteStreams for
 // each new connection. Closing a SocketServer stops listening. SocketServers should not be reused
 // after close.
 class SocketServer(private val scope: CoroutineScope) : Closer {
     private var impl: SocketServerImpl? = null
-
-    enum class SocketProtocol { TCP, UDP }
 
     // Listen for client connections on the given local address. Calls onConnect with a connected
     // ByteStream to communicate with new clients. The ByteStream is closed by the server when the client disconnects.
@@ -66,9 +64,6 @@ private class TcpServerImpl(private val scope: CoroutineScope) : SocketServerImp
         }
     }.exceptionOrNull()?.toError()
 
-    private suspend fun listenerLoop(onConnect: (ByteStream) -> Unit) = coroutineScope {
-    }
-
     override fun close(): Error? = runCatching {
         if (!isClosed()) {
             server.close()
@@ -87,7 +82,16 @@ private class SelectableChannelStream(private val channel: ByteChannel) : ByteSt
             throw StreamError("stream is closed")
         }
         val buffer = ByteBuffer.wrap(bytes)
-        channel.read(buffer)
+        try {
+            val n = channel.read(buffer)
+            when {
+                n < 0 -> 0
+                else -> n
+            }
+        } catch (ex: IOException) {
+            close()
+            0
+        }
     }
 
     override fun write(bytes: ByteArray): Result<Int> = runCatching {
@@ -95,7 +99,12 @@ private class SelectableChannelStream(private val channel: ByteChannel) : ByteSt
             throw StreamError("stream is closed")
         }
         val buffer = ByteBuffer.wrap(bytes)
-        channel.write(buffer)
+        try {
+            channel.write(buffer)
+        } catch (ex: IOException) {
+            close()
+            0
+        }
     }
 
     override fun close(): Error? = runCatching {
