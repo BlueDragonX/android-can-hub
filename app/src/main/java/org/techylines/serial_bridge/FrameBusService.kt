@@ -11,6 +11,11 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import android.os.StrictMode
+import android.os.StrictMode.ThreadPolicy
+
 
 private const val SERVICE_CHANNEL_ID = "FrameBusServiceChannel"
 
@@ -21,14 +26,18 @@ object App {
 }
 
 class FrameBusService : Service() {
-    // The bus connects CAN devices. Connected devices broadcast to all other devices on the bus.
-    var eventBus: FrameBus? = null
-        private set
     // The USB manager handles all connected USB devices.
     var usbManager: UsbManager? = null
         private set
     // The serial manager handles USB serial devices.
     var serialManager: UsbSerialManager? = null
+        private set
+    // Server to accept frames over TCP.
+    // TODO: Build a SocketManager.
+    var tcpServer: SocketServer? = null
+        private set
+    // The bus connects CAN devices. Connected devices broadcast to all other devices on the bus.
+    var eventBus: FrameBus? = null
         private set
 
     // A coroutine scope for the event bus.
@@ -43,7 +52,9 @@ class FrameBusService : Service() {
     }
 
     override fun onCreate() {
-        super.onCreate()
+        // Allow networking.
+        StrictMode.setThreadPolicy(ThreadPolicy.Builder().permitNetwork().build())
+
         Log.v(TAG, "service created")
 
         // Attach USB managers.
@@ -54,6 +65,22 @@ class FrameBusService : Service() {
         if (serialManager == null) {
             serialManager = UsbSerialManager(usbManager!!)
             Log.v(TAG, "init serial manager")
+        }
+        if (tcpServer == null) {
+            tcpServer = SocketServer(scope)
+            val error = tcpServer?.listen(InetSocketAddress(InetAddress.getLocalHost(), 57321), SocketProtocol.TCP) {
+                //  Hardcoded protocol until we have a socket manager.
+                val protocol = FrameProtocolManager.default.getProtocol("RealDash")
+                protocol?.encodeStream(it)?.let {
+                    Log.d(TAG, "new tpc client connection")
+                    scope.launch { eventBus?.add(it) }
+                } ?: Log.e(TAG, "tcp server has incorrect frame protocol")
+            }
+            if (error != null) {
+                Log.e(TAG, "failed to listen on localhost:57321: ${error}")
+            } else {
+                Log.v(TAG, "init tcp server on localhost:57321")
+            }
         }
         if (eventBus == null) {
             eventBus = FrameBus(scope)
@@ -167,7 +194,7 @@ class FrameBusService : Service() {
             return
         }
 
-        var result = serialManager?.attach(device) ?: return
+        val result = serialManager?.attach(device) ?: return
         when {
             result.isSuccess -> {
                 // USB serial device already configure. Attach it to the manager.
