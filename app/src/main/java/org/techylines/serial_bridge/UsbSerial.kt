@@ -274,7 +274,6 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     // Attach a device. Return an error if the device is not configured. Attached devices are
     // connected automatically if they have been configured.
     fun attach(usbDevice: UsbDevice): Result<UsbSerialDevice> = runCatching {
-        Log.v(TAG, "manager: attach device ${usbDevice.deviceName}")
         val id = UsbSerial.getId(usbDevice)
         deviceMap[id]?.let {
             val serialDevice = it

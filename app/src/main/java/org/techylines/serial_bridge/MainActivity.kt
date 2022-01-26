@@ -19,7 +19,6 @@ import java.lang.StringBuilder
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.v(TAG, "app create")
         super.onCreate(savedInstanceState)
 
         val broadcastFilter = IntentFilter()
@@ -27,17 +26,18 @@ class MainActivity : AppCompatActivity() {
         registerReceiver(broadcastReceiver, broadcastFilter)
 
         if (App.service == null) {
-            Log.v(TAG, "create init service")
             ContextCompat.startForegroundService(this, Intent(this, FrameBusService::class.java))
         }
 
         showContent()
         onIntent(intent)
+        Log.d(TAG, "main activity created")
     }
 
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(broadcastReceiver)
+        Log.d(TAG, "main activity destroyed")
     }
 
     private fun onUsbSerialConfigure(intent: Intent) {
@@ -52,7 +52,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onIntent(intent: Intent) {
-        Log.v(TAG, "MainActivity received intent ${intent.action}")
         when (intent.action) {
             UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
                 // Forward USB attach intents to the service.

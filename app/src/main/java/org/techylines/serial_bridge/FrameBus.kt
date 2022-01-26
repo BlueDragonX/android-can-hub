@@ -24,11 +24,9 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
 
         init {
             readJob = scope.launch {
-                Log.v(TAG, "node start read loop for id=${id}")
                 internalReadLoop()
             }
             writeJob = scope.launch {
-                Log.v(TAG, "node start write loop for id=${id}")
                 internalWriteLoop()
             }
         }
@@ -49,7 +47,6 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
             val result = stream.read()
             if (result.isSuccess) {
                 result.getOrNull()?.let {
-                    Log.v(TAG, "frame read node_id=${id} frame=${it}")
                     frames.send(Event(id, it))
                 }
             } else {

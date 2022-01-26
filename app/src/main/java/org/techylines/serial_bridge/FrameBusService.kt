@@ -55,16 +55,12 @@ class FrameBusService : Service() {
         // Allow networking.
         StrictMode.setThreadPolicy(ThreadPolicy.Builder().permitNetwork().build())
 
-        Log.v(TAG, "service created")
-
         // Attach USB managers.
         if (usbManager == null) {
             usbManager = getSystemService(UsbManager::class.java)
-            Log.v(TAG, "init usb manager")
         }
         if (serialManager == null) {
             serialManager = UsbSerialManager(usbManager!!)
-            Log.v(TAG, "init serial manager")
         }
         if (tcpServer == null) {
             tcpServer = SocketServer(scope)
@@ -72,20 +68,17 @@ class FrameBusService : Service() {
                 //  Hardcoded protocol until we have a socket manager.
                 val protocol = FrameProtocolManager.default.getProtocol("RealDash")
                 protocol?.encodeStream(it)?.let {
-                    Log.d(TAG, "new tpc client connection")
+                    Log.d(TAG, "new tpc client connected")
                     scope.launch { eventBus?.add(it) }
                 } ?: Log.e(TAG, "tcp server has incorrect frame protocol")
             }
             if (error != null) {
                 Log.e(TAG, "failed to listen on localhost:57321: ${error}")
-            } else {
-                Log.v(TAG, "init tcp server on localhost:57321")
             }
         }
         if (eventBus == null) {
             eventBus = FrameBus(scope)
             scope.launch { eventBus?.add(HeartbeatStream(Frame(0x6000, "0000000000000000".decodeHex()), 1000)) }
-            Log.v(TAG, "init event bus")
         }
 
         // Listen for USB serial device intents.
@@ -97,6 +90,8 @@ class FrameBusService : Service() {
         intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         registerReceiver(broadcastReceiver, intentFilter)
         App.service = this
+
+        Log.d(TAG, "service created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -104,7 +99,7 @@ class FrameBusService : Service() {
 
         // TODO: attach/connect configured devices
 
-        Log.v(TAG, "service started")
+        Log.d(TAG, "service started")
         return START_STICKY
     }
 
@@ -114,7 +109,7 @@ class FrameBusService : Service() {
         scope.cancel()
         App.service = null
         super.onDestroy()
-        Log.v(TAG, "service stopped")
+        Log.d(TAG, "service destroyed")
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -122,10 +117,9 @@ class FrameBusService : Service() {
     }
 
     private fun createNotification(): Notification {
-        Log.v(TAG, "service creating notification")
         val channel = NotificationChannel(
             SERVICE_CHANNEL_ID,
-            "Serial Bridge",
+            "CAN Hub",
             NotificationManager.IMPORTANCE_DEFAULT
         )
         val manager = getSystemService(NotificationManager::class.java)
@@ -138,8 +132,8 @@ class FrameBusService : Service() {
             intent,
             PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, SERVICE_CHANNEL_ID)
-            .setContentTitle("Serial Bridge Online")
-            .setContentText("Bridging connected USB device.")
+            .setContentTitle("CAN Hub")
+            .setContentText("Bridging connected CAN devices.")
             .setSmallIcon(R.drawable.ic_service_foreground)
             .setContentIntent(pendingIntent)
             .build()
