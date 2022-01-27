@@ -1,6 +1,6 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
-const val TAG = "SerialBridge"
+const val TAG = "CANHub"
 
 const val ACTION_USB_DEVICE_READY = "org.techylines.action.USB_DEVICE_READY"
 const val ACTION_USB_DEVICE_PERMISSION = "org.techylines.action.USB_DEVICE_PERMISSION"

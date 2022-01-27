@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
@@ -110,7 +110,7 @@ class UsbSerialStream(val serialPort: UsbSerialPort) : ByteStream {
             }
         } catch (ex: IOException) {
             // Ignore IO errors when closing the port.
-            Log.w(TAG, "error when closing USB serial port ${serialPort.device.deviceName}: ${ex}")
+            Log.w(TAG, "error when closing USB serial port ${serialPort.device.deviceName}: $ex")
         }
     }.errorOrNull()
 
@@ -162,7 +162,7 @@ class UsbSerialDevice(config: UsbSerialConfig) {
 
     internal fun connect(usbManager: UsbManager): Result<FrameStream> = runCatching {
         serialPort?.let {
-            val protocol = config.protocol ?: throw ProtocolError("protocol ${config.protocolName} not found", )
+            val protocol = config.protocol ?: throw ProtocolError("protocol ${config.protocolName} not found")
 
             if (it.isOpen) {
                 throw DeviceConnectedError(it.device)
@@ -302,8 +302,10 @@ class UsbSerialManager(private val usbManager: UsbManager) {
         }
         for (usbDevice in usbManager.deviceList.values) {
             deviceMap[UsbSerial.getId(usbDevice)]?.let {
-                attach(usbDevice)?.let {
+                val result = attach(usbDevice)
+                if (result.isFailure) {
                     Log.e(TAG, "failed to attach previously configured device ${usbDevice.deviceName}")
+                    Log.e(TAG, "  error=\"${result.exceptionOrNull()}\"")
                     Log.e(TAG, "  manufacturer_name=${usbDevice.manufacturerName}")
                     Log.e(TAG, "  product_name=${usbDevice.productName}")
                     Log.e(TAG, "  vendor_id=${usbDevice.vendorId}")

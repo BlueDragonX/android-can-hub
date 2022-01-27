@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 fun String.decodeHex(): ByteArray {
     check(length % 2 == 0) { "must have an even length" }

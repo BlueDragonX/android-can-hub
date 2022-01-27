@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("org.techylines.serial_bridge", appContext.packageName)
+        assertEquals("org.techylines.can_hub", appContext.packageName)
     }
 }

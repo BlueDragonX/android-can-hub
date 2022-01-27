@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.util.Log
 import java.nio.ByteBuffer

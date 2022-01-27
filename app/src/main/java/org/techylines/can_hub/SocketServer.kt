@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.util.Log
 import kotlinx.coroutines.*
@@ -27,7 +27,7 @@ class SocketServer(private val scope: CoroutineScope) : Closer {
             }
             else -> {
                 //TODO: Implement UDP.
-                ProtocolError("socket protocol ${protocol} not yet supported")
+                ProtocolError("socket protocol $protocol not yet supported")
             }
         }
     }

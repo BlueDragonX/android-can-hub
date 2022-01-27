@@ -1,7 +1,6 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.hardware.usb.UsbDevice
-import android.util.Log
 
 // Base class for app errors.
 open class Error(message: String, cause: Throwable? = null) : Throwable(message, cause)

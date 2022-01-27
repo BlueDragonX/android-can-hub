@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -10,11 +10,7 @@ import android.hardware.usb.UsbManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.widget.Button
-import android.widget.TextView
 import androidx.core.content.ContextCompat
-import java.lang.NullPointerException
-import java.lang.StringBuilder
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,13 +38,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun onUsbSerialConfigure(intent: Intent) {
         val device : UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
-        App.service?.serialManager?.let {
-            //TODO: Build a UI for this.
-            it.configure(device, SerialConfig(dtr=true), true, "RealDash")
-        }
-        intent.getParcelableExtra<PendingIntent>(EXTRA_PENDING_INTENT)?.let {
-            it.send()
-        }
+        App.service?.serialManager?.configure(device, SerialConfig(dtr=true), true, "RealDash")
+        intent.getParcelableExtra<PendingIntent>(EXTRA_PENDING_INTENT)?.send()
     }
 
     private fun onIntent(intent: Intent) {

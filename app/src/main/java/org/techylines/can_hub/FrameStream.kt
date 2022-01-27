@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 // Interface for objects that read frames from a stream. These are typically implemented as
 // wrappers around a ByteReader. Closes any underlying readers when closed.

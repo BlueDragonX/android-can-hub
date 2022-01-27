@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 interface FrameProtocol {
     // The short name of the protocol. Must be unique.

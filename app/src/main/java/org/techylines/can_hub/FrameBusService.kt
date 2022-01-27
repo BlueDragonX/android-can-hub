@@ -1,4 +1,4 @@
-package org.techylines.serial_bridge
+package org.techylines.can_hub
 
 import android.app.*
 import android.content.BroadcastReceiver
@@ -15,6 +15,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy
+import org.techylines.can_hub.R
 
 
 private const val SERVICE_CHANNEL_ID = "FrameBusServiceChannel"
@@ -73,7 +74,7 @@ class FrameBusService : Service() {
                 } ?: Log.e(TAG, "tcp server has incorrect frame protocol")
             }
             if (error != null) {
-                Log.e(TAG, "failed to listen on localhost:57321: ${error}")
+                Log.e(TAG, "failed to listen on localhost:57321: $error")
             }
         }
         if (eventBus == null) {
