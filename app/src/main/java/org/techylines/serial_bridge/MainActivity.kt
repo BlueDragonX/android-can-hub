@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity() {
         val device : UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
         App.service?.serialManager?.let {
             //TODO: Build a UI for this.
-            it.configure(device, SerialConfig(), true, "RealDash")
+            it.configure(device, SerialConfig(dtr=true), true, "RealDash")
         }
         intent.getParcelableExtra<PendingIntent>(EXTRA_PENDING_INTENT)?.let {
             it.send()
