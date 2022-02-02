@@ -1,4 +1,6 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.frame
+
+import org.techylines.can_hub.real_dash.RealDashProtocol
 
 interface FrameProtocol {
     // The short name of the protocol. Must be unique.
