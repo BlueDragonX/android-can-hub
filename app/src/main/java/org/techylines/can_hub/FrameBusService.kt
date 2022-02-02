@@ -8,14 +8,15 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.IBinder
+import android.os.StrictMode
+import android.os.StrictMode.ThreadPolicy
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import org.techylines.can_hub.serial.UsbSerialManager
+import org.techylines.can_hub.socket.SocketServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import android.os.StrictMode
-import android.os.StrictMode.ThreadPolicy
-import org.techylines.can_hub.R
 
 
 private const val SERVICE_CHANNEL_ID = "FrameBusServiceChannel"
@@ -65,7 +66,7 @@ class FrameBusService : Service() {
         }
         if (tcpServer == null) {
             tcpServer = SocketServer(scope)
-            val error = tcpServer?.listen(InetSocketAddress(InetAddress.getLocalHost(), 57321), SocketProtocol.TCP) {
+            val error = tcpServer?.listen(InetSocketAddress(InetAddress.getLocalHost(), 57321), SocketServer.Protocol.TCP) {
                 //  Hardcoded protocol until we have a socket manager.
                 val protocol = FrameProtocolManager.default.getProtocol("RealDash")
                 protocol?.encodeStream(it)?.let {
