@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
 import org.techylines.can_hub.*
+import org.techylines.can_hub.frame.FrameStream
 import java.io.InputStream
 import java.io.OutputStream
 

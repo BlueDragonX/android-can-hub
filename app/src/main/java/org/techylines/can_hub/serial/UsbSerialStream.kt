@@ -3,6 +3,8 @@ package org.techylines.can_hub.serial
 import android.util.Log
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import org.techylines.can_hub.*
+import org.techylines.can_hub.frame.ByteReaderIterator
+import org.techylines.can_hub.frame.ByteStream
 import java.io.IOException
 
 // Wraps a UsbSerialPort in a ByteStream interface.

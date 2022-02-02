@@ -13,21 +13,16 @@ import android.os.StrictMode.ThreadPolicy
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import org.techylines.can_hub.frame.Frame
+import org.techylines.can_hub.frame.FrameBus
+import org.techylines.can_hub.frame.FrameProtocolManager
 import org.techylines.can_hub.serial.UsbSerialManager
 import org.techylines.can_hub.socket.SocketServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
 
 
-private const val SERVICE_CHANNEL_ID = "FrameBusServiceChannel"
-
-object App {
-    // Surface the bus service if it's running.
-    var service : FrameBusService? = null
-        internal set
-}
-
-class FrameBusService : Service() {
+class HubService : Service() {
     // The USB manager handles all connected USB devices.
     var usbManager: UsbManager? = null
         private set

@@ -2,6 +2,8 @@ package org.techylines.can_hub
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.techylines.can_hub.frame.FakeByteStream
+import org.techylines.can_hub.frame.Frame
 import java.lang.Exception
 import java.util.zip.CRC32
 

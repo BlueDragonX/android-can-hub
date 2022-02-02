@@ -1,6 +1,10 @@
 package org.techylines.can_hub
 
 import android.util.Log
+import org.techylines.can_hub.frame.ByteStream
+import org.techylines.can_hub.frame.Frame
+import org.techylines.can_hub.frame.FrameProtocol
+import org.techylines.can_hub.frame.FrameStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

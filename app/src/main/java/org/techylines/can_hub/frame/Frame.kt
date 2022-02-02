@@ -1,5 +1,6 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.frame
 
+import org.techylines.can_hub.toHexString
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*

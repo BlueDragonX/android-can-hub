@@ -1,7 +1,9 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.frame
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.techylines.can_hub.decodeHex
+import org.techylines.can_hub.toHexString
 
 class ByteReaderIteratorTest {
     @Test

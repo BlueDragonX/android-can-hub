@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.techylines.can_hub.*
+import org.techylines.can_hub.frame.ByteStream
+import org.techylines.can_hub.frame.Closer
 import java.net.SocketAddress
 import java.nio.channels.ServerSocketChannel
 

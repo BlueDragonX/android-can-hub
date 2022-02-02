@@ -1,7 +1,9 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.frame
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
+import org.techylines.can_hub.Error
+import org.techylines.can_hub.StreamError
 
 // Reads from a ByteArray. Closes when it reaches the end of the array.
 class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4096) : ByteReader {
@@ -37,7 +39,8 @@ class FakeByteReader(val buffer: ByteArray, override val readBufferSize: Int = 4
 }
 
 // Reads and writes to an internal buffer. Does not close until calling close.
-class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize: Int = 4096, private val writeLimit: Int = 0) : ByteStream {
+class FakeByteStream(val buffer: MutableList<Byte>, override val readBufferSize: Int = 4096, private val writeLimit: Int = 0) :
+    ByteStream {
     private var position: Int = 0
     private var closed = false
     private val iter = ByteReaderIterator(this)

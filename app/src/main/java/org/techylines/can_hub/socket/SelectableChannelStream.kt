@@ -1,6 +1,10 @@
 package org.techylines.can_hub.socket
 
-import org.techylines.can_hub.*
+import org.techylines.can_hub.Error
+import org.techylines.can_hub.StreamError
+import org.techylines.can_hub.frame.ByteReaderIterator
+import org.techylines.can_hub.frame.ByteStream
+import org.techylines.can_hub.toError
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.ByteChannel

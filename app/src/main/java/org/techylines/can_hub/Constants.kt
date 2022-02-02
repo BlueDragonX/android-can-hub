@@ -2,6 +2,8 @@ package org.techylines.can_hub
 
 const val TAG = "CANHub"
 
+const val SERVICE_CHANNEL_ID = "HubServiceChannel"
+
 const val ACTION_USB_DEVICE_READY = "org.techylines.action.USB_DEVICE_READY"
 const val ACTION_USB_DEVICE_PERMISSION = "org.techylines.action.USB_DEVICE_PERMISSION"
 

@@ -1,4 +1,4 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.serial
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

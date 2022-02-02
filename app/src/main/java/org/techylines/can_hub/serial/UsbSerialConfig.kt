@@ -4,9 +4,8 @@ import android.hardware.usb.UsbDevice
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
-import org.techylines.can_hub.FrameProtocol
-import org.techylines.can_hub.FrameProtocolManager
-import org.techylines.can_hub.SerialConfig
+import org.techylines.can_hub.frame.FrameProtocol
+import org.techylines.can_hub.frame.FrameProtocolManager
 
 // Holds USB serial device configuration for connected and disconnected devices.
 @Parcelize

@@ -2,7 +2,11 @@ package org.techylines.can_hub.serial
 
 import android.hardware.usb.UsbManager
 import com.hoho.android.usbserial.driver.UsbSerialPort
-import org.techylines.can_hub.*
+import org.techylines.can_hub.DeviceConnectedError
+import org.techylines.can_hub.DeviceNotAttachedError
+import org.techylines.can_hub.DeviceOpenError
+import org.techylines.can_hub.ProtocolError
+import org.techylines.can_hub.frame.FrameStream
 
 class UsbSerialDevice(config: UsbSerialConfig) {
     var config: UsbSerialConfig

@@ -1,9 +1,11 @@
-package org.techylines.can_hub
+package org.techylines.can_hub.frame
 
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
+import org.techylines.can_hub.Error
+import org.techylines.can_hub.TAG
 import java.util.concurrent.ConcurrentHashMap
 
 class FrameBus(private val scope: CoroutineScope) : Closer {
@@ -105,6 +107,7 @@ class FrameBus(private val scope: CoroutineScope) : Closer {
     }
 
     private suspend fun onEvent(event: Event) = coroutineScope {
+        Log.v(TAG, "receive ${event.frame}")
         for (node in nodes) {
             if (node.value.isClosed()) {
                 nodes.remove(node.key)
