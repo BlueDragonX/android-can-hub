@@ -21,7 +21,7 @@ class DeviceConnectedError(device: UsbDevice) : DeviceError("device already conn
 class DeviceNotConfiguredError(device: UsbDevice) : DeviceError("device not configured", device)
 
 // A USB device is not supported by the serial driver.
-class DeviceNotSupportedError(device: UsbDevice) : DeviceError("device not supported", device)
+class DeviceNotSupportedError(message: String) : DeviceError(message)
 
 // Parse error when parsing of a byte stream fails.
 class ParseError(message: String) : Error(message)

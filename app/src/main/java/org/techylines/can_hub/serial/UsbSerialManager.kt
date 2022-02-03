@@ -44,8 +44,8 @@ class UsbSerialManager(private val usbManager: UsbManager) {
             it
         } ?: run {
             val serialPort = UsbSerial.getSerialPort(usbDevice) ?:
-            throw DeviceNotSupportedError(usbDevice)
-            val serialDevice = UsbSerialDevice(config)
+            throw DeviceNotSupportedError("device ${usbDevice.deviceName} not supported")
+            val serialDevice = UsbSerialDevice(config, usbManager)
             serialDevice.attach(serialPort)
             deviceMap[id] = serialDevice
             deviceNameMap[usbDevice.deviceName] = serialDevice.id
@@ -70,7 +70,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     // Connect a configured device. Returns an error on failure or if the device is not configured.
     fun connect(usbDevice: UsbDevice): Result<FrameStream> {
         val id = UsbSerial.getId(usbDevice)
-        return deviceMap[id]?.connect(usbManager) ?:
+        return deviceMap[id]?.connect() ?:
         throw DeviceNotConfiguredError(usbDevice)
     }
 
@@ -89,7 +89,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
                 serialDevice.attach(it)
                 deviceNameMap[usbDevice.deviceName] = serialDevice.id
                 serialDevice
-            } ?: throw DeviceNotSupportedError(usbDevice)
+            } ?: throw DeviceNotSupportedError("device ${usbDevice.deviceName} not supported")
         } ?: throw DeviceNotConfiguredError(usbDevice)
     }
 
@@ -106,7 +106,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     fun load(file: InputStream): Error? = runCatching {
         val usbSerialConfigList = Json.decodeFromStream<List<UsbSerialConfig>>(file)
         for (config in usbSerialConfigList) {
-            deviceMap[UsbSerial.getId(config.usbDeviceId)] = UsbSerialDevice(config)
+            deviceMap[UsbSerial.getId(config.usbDeviceId)] = UsbSerialDevice(config, usbManager)
         }
         for (usbDevice in usbManager.deviceList.values) {
             deviceMap[UsbSerial.getId(usbDevice)]?.let {

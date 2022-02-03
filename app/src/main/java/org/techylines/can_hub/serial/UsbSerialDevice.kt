@@ -1,6 +1,7 @@
 package org.techylines.can_hub.serial
 
 import android.hardware.usb.UsbManager
+import android.os.Bundle
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import org.techylines.can_hub.DeviceConnectedError
 import org.techylines.can_hub.DeviceNotAttachedError
@@ -8,35 +9,23 @@ import org.techylines.can_hub.DeviceOpenError
 import org.techylines.can_hub.ProtocolError
 import org.techylines.can_hub.frame.FrameStream
 
-class UsbSerialDevice(config: UsbSerialConfig) {
-    var config: UsbSerialConfig
-        private set
-    // The byte stream. Only set when the device is connected.
-    var stream: UsbSerialStream? = null
-        private set
+class UsbSerialDevice(config: UsbSerialConfig, private val usbManager: UsbManager) {
+    val metadata = Bundle()
 
     init {
-        this.config = config
-    }
-
-    enum class State {
-        ATTACHED,	// device is attached but not connected; may not be configured
-        DETACHED,	// device is detached and has a configuration
-        CONNECTED,  // device is connected
+        metadata.putParcelable(META_USB_CONFIG, config)
     }
 
     val id: Int
         get() = UsbSerial.getId(config.usbDeviceId)
-    private var serialPort: UsbSerialPort? = null
 
-    val state: State
-        get() {
-            return when (serialPort?.isOpen) {
-                true -> State.CONNECTED
-                false -> State.ATTACHED
-                null -> State.DETACHED
-            }
-        }
+    val config: UsbSerialConfig
+        get() = metadata.getParcelable(META_USB_CONFIG)!!
+
+    // The USB serial port. Only set when the device is attached.
+    private var serialPort: UsbSerialPort? = null
+    // The byte stream. Only set after the device is connected. May still be set after disonnect.
+    private var stream: UsbSerialStream? = null
 
     internal fun attach(serialPort: UsbSerialPort) {
         this.serialPort = serialPort
@@ -47,7 +36,7 @@ class UsbSerialDevice(config: UsbSerialConfig) {
         serialPort = null
     }
 
-    internal fun connect(usbManager: UsbManager): Result<FrameStream> = runCatching {
+    fun connect(): Result<FrameStream> = runCatching {
         serialPort?.let {
             val protocol = config.protocol ?: throw ProtocolError("protocol ${config.protocolName} not found")
 
@@ -58,14 +47,14 @@ class UsbSerialDevice(config: UsbSerialConfig) {
                 ?: throw DeviceOpenError(it.device)
 
             it.open(con)
-            configureSerialPort()
+            configureSerialPort(config.serialConfig)
             val byteStream = UsbSerialStream(serialPort!!)
             stream = byteStream
             protocol.encodeStream(byteStream)
         } ?: throw DeviceNotAttachedError()
     }
 
-    internal fun disconnect() {
+    fun disconnect() {
         stream?.let {
             it.close()
             stream = null
@@ -73,20 +62,20 @@ class UsbSerialDevice(config: UsbSerialConfig) {
     }
 
     internal fun reconfigure(config: UsbSerialConfig) {
-        this.config = config
-        configureSerialPort()
+        metadata.putParcelable(META_USB_CONFIG, config)
+        configureSerialPort(config.serialConfig)
     }
 
-    private fun configureSerialPort() {
+    private fun configureSerialPort(serialConfig: SerialConfig) {
         serialPort?.let {
             it.setParameters(
-                config.serialConfig.baudRate,
-                config.serialConfig.dataBits.value,
-                config.serialConfig.stopBits.value,
-                config.serialConfig.parity.value,
+                serialConfig.baudRate,
+                serialConfig.dataBits.value,
+                serialConfig.stopBits.value,
+                serialConfig.parity.value,
             )
-            it.dtr = config.serialConfig.dtr
-            it.rts = config.serialConfig.rts
+            it.dtr = serialConfig.dtr
+            it.rts = serialConfig.rts
         }
     }
 }
