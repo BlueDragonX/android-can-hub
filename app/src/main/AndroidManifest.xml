@@ -14,7 +14,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CANBus">
         <service
-            android:name="org.techylines.can_hub.FrameBusService"
+            android:name="org.techylines.can_hub.HubService"
             android:enabled="true"
             android:exported="true">
         </service>
