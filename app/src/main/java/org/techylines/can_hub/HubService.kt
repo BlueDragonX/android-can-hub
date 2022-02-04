@@ -39,8 +39,7 @@ class HubService : Service() {
 
     // A coroutine scope for the event bus.
     private var scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    private var heartbeatFrame = Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex())
+    private var heartbeat = HeartbeatStream(Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex()), 1000)
 
     var connectedDevice: UsbDevice? = null
         private set
@@ -80,7 +79,7 @@ class HubService : Service() {
         }
         if (eventBus == null) {
             eventBus = FrameBus(scope.coroutineContext)
-            scope.launch { eventBus?.add(HeartbeatStream(Frame(0x6000, "0000000000000000".decodeHex()), 1000)) }
+            scope.launch { eventBus?.add(heartbeat) }
         }
 
         // Listen for USB serial device intents.
@@ -171,6 +170,7 @@ class HubService : Service() {
                 usbManager?.requestPermission(device, pendingIntentFactory())
             } else {
                 Log.d(TAG, "permission denied for device ${device.deviceName}")
+                heartbeat.frame.data = HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex()
                 sendBroadcast(Intent(ACTION_UI_DEVICE_DISCONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
             }
             return
@@ -189,7 +189,7 @@ class HubService : Service() {
                             .putExtra(UsbManager.EXTRA_DEVICE, device)
                     )
                 }
-                heartbeatFrame = Frame(0x6000, HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex())
+                heartbeat.frame.data = HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex()
             }
             result.exceptionOrNull() is DeviceNotConfiguredError -> {
                 // USB serial device it not configured. Request configuration from the user.
@@ -209,7 +209,7 @@ class HubService : Service() {
     private fun onUsbSerialDetach(intent: Intent) {
         val device: UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
         serialManager?.detach(device)
-        heartbeatFrame = Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex())
+        heartbeat.frame.data = HEARTBEAT_DETACHED_PAYLOAD.decodeHex()
     }
 
     // Connect an attached device. This is a noop if the device is not attached.
@@ -218,7 +218,6 @@ class HubService : Service() {
         val result = serialManager?.connect(device)
         result?.getOrNull()?.let {
             Log.d(TAG, "device ${device.deviceName} connected")
-            heartbeatFrame = Frame(0x6000, HEARTBEAT_CONNECTED_PAYLOAD.decodeHex())
             connectedDevice = device
             scope.launch {
                 eventBus?.add(it)
@@ -228,8 +227,10 @@ class HubService : Service() {
                     delay(500)
                 }
                 connectedDevice = null
+                heartbeat.frame.data = HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex()
                 sendBroadcast(Intent(ACTION_UI_DEVICE_DISCONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
             }
+            heartbeat.frame.data = HEARTBEAT_CONNECTED_PAYLOAD.decodeHex()
             sendBroadcast(Intent(ACTION_UI_DEVICE_CONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
         } ?: run {
             Log.w(TAG, "device ${device.deviceName} failed to connect:\n${result?.exceptionOrNull() ?: "    unknown error"}")
@@ -240,7 +241,7 @@ class HubService : Service() {
     private fun onUsbSerialDisconnect(intent: Intent) {
         val device: UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
         serialManager?.disconnect(device)
-        heartbeatFrame = Frame(0x6000, HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex())
+        heartbeat.frame.data = HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex()
     }
 
     // Remove a serial device from the USB serial manager.

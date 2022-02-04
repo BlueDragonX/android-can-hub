@@ -4,7 +4,7 @@ import org.techylines.can_hub.frame.Frame
 import org.techylines.can_hub.frame.FrameStream
 
 // A stream that periodically sends a heartbeat frame on the bus.
-class HeartbeatStream(private val frame: Frame, private val periodMs: Long) : FrameStream {
+class HeartbeatStream(val frame: Frame, private val periodMs: Long) : FrameStream {
     private var closed = false
     private var lastSend: Long = 0
 
