@@ -40,6 +40,8 @@ class HubService : Service() {
     // A coroutine scope for the event bus.
     private var scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    private var heartbeatFrame = Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex())
+
     private var broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent?.let {
@@ -199,6 +201,7 @@ class HubService : Service() {
                             .putExtra(UsbManager.EXTRA_DEVICE, device)
                     )
                 }
+                heartbeatFrame = Frame(0x6000, HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex())
             }
             result.exceptionOrNull() is DeviceNotConfiguredError -> {
                 // USB serial device it not configured. Request configuration from the user.
@@ -218,6 +221,7 @@ class HubService : Service() {
     private fun onUsbSerialDetach(intent: Intent) {
         val device: UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
         serialManager?.detach(device)
+        heartbeatFrame = Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex())
     }
 
     // Connect an attached device. This is a noop if the device is not attached.
@@ -226,6 +230,7 @@ class HubService : Service() {
         val result = serialManager?.connect(device)
         result?.getOrNull()?.let {
             Log.d(TAG, "device ${device.deviceName} connected")
+            heartbeatFrame = Frame(0x6000, HEARTBEAT_CONNECTED_PAYLOAD.decodeHex())
             scope.launch {
                 eventBus?.add(it)
             }
@@ -238,6 +243,7 @@ class HubService : Service() {
     private fun onUsbSerialDisconnect(intent: Intent) {
         val device: UsbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) ?: return
         serialManager?.disconnect(device)
+        heartbeatFrame = Frame(0x6000, HEARTBEAT_DISCONNECTED_PAYLOAD.decodeHex())
     }
 
     // Remove a serial device from the USB serial manager.
