@@ -7,10 +7,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import org.techylines.can_hub.serial.SerialConfig
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,7 +23,7 @@ class MainActivity : AppCompatActivity() {
         registerReceiver(broadcastReceiver, broadcastFilter)
 
         if (App.service == null) {
-            ContextCompat.startForegroundService(this, Intent(this, FrameBusService::class.java))
+            ContextCompat.startForegroundService(this, Intent(this, HubService::class.java))
         }
 
         showContent()
