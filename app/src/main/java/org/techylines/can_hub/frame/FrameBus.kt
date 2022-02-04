@@ -6,12 +6,14 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
 import org.techylines.can_hub.TAG
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.CoroutineContext
 
-class FrameBus(private val scope: CoroutineScope) : Closer {
+class FrameBus(private val coroutineContext: CoroutineContext) : Closer {
     private val frames = Channel<Event>()
     private val streams = Channel<FrameStream>(1)
     private val nodes = ConcurrentHashMap<Long, Node>()
     private var id: Long = 0
+    private val scope = CoroutineScope(coroutineContext)
 
     private data class Event (
         val sourceId: Long,

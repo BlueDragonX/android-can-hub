@@ -25,16 +25,30 @@ internal object UsbSerial {
 
     // Get a serial port for a USB device. Return null if the USB device is not supported.
     fun getSerialPort(usbDevice: UsbDevice): UsbSerialPort? {
-        val driver = prober.probeDevice(usbDevice)
-        if (driver == null) {
-            Log.w(TAG, "USB device ${usbDevice.deviceName} not supported by serial driver")
+        try {
+            val driver = prober.probeDevice(usbDevice)
+            if (driver == null) {
+                Log.w(TAG, "USB device ${usbDevice.deviceName} not supported by serial driver")
+                return null
+            }
+            val port = driver.ports[0]
+            if (port == null) {
+                Log.w(TAG, "USB device ${usbDevice.deviceName} has no ports")
+                return null
+            }
+            return port
+        } catch (ex: Throwable) {
             return null
         }
-        val port = driver.ports[0]
-        if (port == null) {
-            Log.w(TAG, "USB device ${usbDevice.deviceName} has no ports")
-            return null
-        }
-        return port
+    }
+
+    // Return true if the USB device is a supported serial device.
+    fun isSupported(usbDevice: UsbDevice): Boolean {
+        try {
+            prober.probeDevice(usbDevice)?.let {
+                return it.ports.size > 0
+            }
+        } catch (ex: Throwable) {}
+        return false
     }
 }

@@ -7,7 +7,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
-import org.techylines.can_hub.*
+import org.techylines.can_hub.DeviceNotConfiguredError
+import org.techylines.can_hub.DeviceNotSupportedError
+import org.techylines.can_hub.TAG
+import org.techylines.can_hub.errorOrNull
 import org.techylines.can_hub.frame.FrameStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -70,8 +73,8 @@ class UsbSerialManager(private val usbManager: UsbManager) {
     // Connect a configured device. Returns an error on failure or if the device is not configured.
     fun connect(usbDevice: UsbDevice): Result<FrameStream> {
         val id = UsbSerial.getId(usbDevice)
-        return deviceMap[id]?.connect() ?:
-        throw DeviceNotConfiguredError(usbDevice)
+        return deviceMap[id]?.connect()
+            ?: throw DeviceNotConfiguredError(usbDevice)
     }
 
     // Disconnect a device.
@@ -79,8 +82,7 @@ class UsbSerialManager(private val usbManager: UsbManager) {
         deviceMap[UsbSerial.getId(usbDevice)]?.disconnect()
     }
 
-    // Attach a device. Return an error if the device is not configured. Attached devices are
-    // connected automatically if they have been configured.
+    // Attach a device. Return an error if the device is not configured.
     fun attach(usbDevice: UsbDevice): Result<UsbSerialDevice> = runCatching {
         val id = UsbSerial.getId(usbDevice)
         deviceMap[id]?.let {

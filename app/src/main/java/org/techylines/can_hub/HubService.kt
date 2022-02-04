@@ -42,6 +42,9 @@ class HubService : Service() {
 
     private var heartbeatFrame = Frame(0x6000, HEARTBEAT_DETACHED_PAYLOAD.decodeHex())
 
+    var connectedDevice: UsbDevice? = null
+        private set
+
     private var broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent?.let {
@@ -76,7 +79,7 @@ class HubService : Service() {
             }
         }
         if (eventBus == null) {
-            eventBus = FrameBus(scope)
+            eventBus = FrameBus(scope.coroutineContext)
             scope.launch { eventBus?.add(HeartbeatStream(Frame(0x6000, "0000000000000000".decodeHex()), 1000)) }
         }
 
@@ -138,28 +141,6 @@ class HubService : Service() {
             .build()
     }
 
-    // Return true if the user has permission to access a device when receiving an intent. Will
-    // request permission if necessary. In such a case a pending intent is generated from the
-    // provided lambda.
-    private fun acquireUsbDevicePermission(intent: Intent, device: UsbDevice, pendingIntentFactory: ()->PendingIntent): Boolean {
-        // App already has permission to use the device.
-        if (usbManager?.hasPermission(device) == true) {
-            Log.d(TAG, "permission granted for device ${device.deviceName}")
-            return true
-        }
-
-        // Request permission if the user hasn't already denied access.
-        // in such a case.
-        if (intent.extras?.containsKey(UsbManager.EXTRA_PERMISSION_GRANTED) == true &&
-            !intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-            Log.d(TAG, "permission denied for device ${device.deviceName}")
-        } else {
-            Log.d(TAG, "requesting permission for  device ${device.deviceName}")
-            usbManager?.requestPermission(device, pendingIntentFactory())
-        }
-        return false
-    }
-
     // Attach a USB device to the serial manager. Checks if the app has permission,
     // is configured, and if auto-connect is enabled. May send intents to acquire
     // permission and configuration. A pending intent will be included with both requests
@@ -183,8 +164,15 @@ class HubService : Service() {
             )
         }
 
-        // Check (and request) permission for the device.
-        if (!acquireUsbDevicePermission(intent, device, pendingIntentFactory)) {
+        // Check permission for the device.
+        if (usbManager?.hasPermission(device) != true) {
+            if (intent.getBooleanExtra(EXTRA_ACQUIRE_PERMISSION, false)) {
+                Log.d(TAG, "requesting permission for device ${device.deviceName}")
+                usbManager?.requestPermission(device, pendingIntentFactory())
+            } else {
+                Log.d(TAG, "permission denied for device ${device.deviceName}")
+                sendBroadcast(Intent(ACTION_UI_DEVICE_DISCONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
+            }
             return
         }
 
@@ -206,7 +194,7 @@ class HubService : Service() {
             result.exceptionOrNull() is DeviceNotConfiguredError -> {
                 // USB serial device it not configured. Request configuration from the user.
                 Log.d(TAG, "device ${device.deviceName} not configured")
-                sendBroadcast(Intent(ACTION_USB_SERIAL_DEVICE_CONFIGURE)
+                sendBroadcast(Intent(ACTION_UI_DEVICE_CONFIGURE)
                     .putExtra(UsbManager.EXTRA_DEVICE, device)
                     .putExtra(EXTRA_PENDING_INTENT, pendingIntentFactory()))
             }
@@ -231,9 +219,18 @@ class HubService : Service() {
         result?.getOrNull()?.let {
             Log.d(TAG, "device ${device.deviceName} connected")
             heartbeatFrame = Frame(0x6000, HEARTBEAT_CONNECTED_PAYLOAD.decodeHex())
+            connectedDevice = device
             scope.launch {
                 eventBus?.add(it)
             }
+            scope.launch {
+                while (!it.isClosed()) {
+                    delay(500)
+                }
+                connectedDevice = null
+                sendBroadcast(Intent(ACTION_UI_DEVICE_DISCONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
+            }
+            sendBroadcast(Intent(ACTION_UI_DEVICE_CONNECT).putExtra(UsbManager.EXTRA_DEVICE, device))
         } ?: run {
             Log.w(TAG, "device ${device.deviceName} failed to connect:\n${result?.exceptionOrNull() ?: "    unknown error"}")
         }
