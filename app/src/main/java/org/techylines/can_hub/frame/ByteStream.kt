@@ -1,7 +1,6 @@
 package org.techylines.can_hub.frame
 
 import android.util.Log
-import org.techylines.can_hub.Error
 import org.techylines.can_hub.TAG
 import java.nio.ByteBuffer
 

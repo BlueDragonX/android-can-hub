@@ -4,7 +4,6 @@ import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
-import org.techylines.can_hub.Error
 import org.techylines.can_hub.TAG
 import java.util.concurrent.ConcurrentHashMap
 

@@ -2,9 +2,6 @@ package org.techylines.can_hub
 
 import android.hardware.usb.UsbDevice
 
-// Base class for app errors.
-open class Error(message: String, cause: Throwable? = null) : Throwable(message, cause)
-
 // Indicates that an error occurred on an attached USB device.
 open class DeviceError(message: String, val device: UsbDevice? = null) : Error(message)
 

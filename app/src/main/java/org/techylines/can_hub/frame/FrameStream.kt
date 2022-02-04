@@ -1,7 +1,5 @@
 package org.techylines.can_hub.frame
 
-import org.techylines.can_hub.Error
-
 // Interface for objects that read frames from a stream. These are typically implemented as
 // wrappers around a ByteReader. Closes any underlying readers when closed.
 interface FrameReader : Closer {
